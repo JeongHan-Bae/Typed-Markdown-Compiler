@@ -1,0 +1,3 @@
+# Exclude repository infrastructure and local tooling from GitHub language stats.
+.github/** linguist-detectable=false
+scripts/** linguist-detectable=false

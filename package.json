@@ -1,0 +1,35 @@
+{
+  "name": "typed-markdown-compiler",
+  "version": "0.1.0",
+  "private": true,
+  "description": "An AST-first TypeScript Markdown content compiler for static websites.",
+  "type": "module",
+  "engines": {
+    "node": ">=18.18"
+  },
+  "scripts": {
+    "build": "node --import=tsx src/build.ts",
+    "build:native": "node --experimental-strip-types src/build.ts",
+    "check": "tsc --noEmit",
+    "test": "node --import=tsx --test test/*.test.ts",
+    "compile": "bash dev/compiler.sh",
+    "dev": "bash dev/launcher.sh",
+    "rt-test": "bash dev/rt-test.sh"
+  },
+  "dependencies": {
+    "@vue/server-renderer": "^3.5.41",
+    "less": "^4.2.0",
+    "remark-gfm": "^4.0.0",
+    "remark-parse": "^11.0.0",
+    "unified": "^11.0.5",
+    "vue": "^3.5.41",
+    "yaml": "^2.6.0"
+  },
+  "devDependencies": {
+    "@types/less": "^3.0.8",
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vite": "^6.4.3"
+  }
+}

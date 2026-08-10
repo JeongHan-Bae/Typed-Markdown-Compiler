@@ -1,0 +1,80 @@
+name: Build and Deploy
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      VITE_BASE_PATH: /${{ github.event.repository.name }}/
+      GITHUB_REPOSITORY_NAME: ${{ github.event.repository.name }}
+      GITHUB_USERNAME: ${{ github.repository_owner }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Resolve site identity
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          owner_full_name="$(gh api "users/${GITHUB_USERNAME}" --jq '.name // .login' || true)"
+          owner_full_name="${owner_full_name:-${GITHUB_USERNAME}}"
+          printf 'GITHUB_USER_FULL_NAME=%s\n' "$owner_full_name" >> "$GITHUB_ENV"
+          printf "SITE_TITLE=%s's Personal Blog\n" "$owner_full_name" >> "$GITHUB_ENV"
+
+      - name: Test
+        env:
+          SITE_TITLE: "Personal Blog"
+          GITHUB_USERNAME: ""
+          GITHUB_USER_FULL_NAME: ""
+          FOOTER_TEXT: ""
+          VITE_BASE_PATH: ""
+          GITHUB_REPOSITORY_NAME: ""
+        run: |
+          npm test
+          npm run rt-test
+
+      - name: Build
+        run: npm run build
+
+      - name: Deploy to deploy
+        env:
+          DEPLOY_BRANCH: deploy
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          publish_dir="$(mktemp -d)"
+          cp -R dist/. "${publish_dir}/"
+          touch "${publish_dir}/.nojekyll"
+
+          cd "${publish_dir}"
+          git init --initial-branch="${DEPLOY_BRANCH}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .
+          git commit -m "deploy: update site for ${GITHUB_SHA}"
+          git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git push --force origin "HEAD:${DEPLOY_BRANCH}"

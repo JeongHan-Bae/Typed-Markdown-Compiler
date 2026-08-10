@@ -1,0 +1,14 @@
+---
+title: Runtime notes
+description: A fixture collection index.
+type: list
+source: entries/
+---
+
+# Runtime notes
+
+This list head is discovered from the runtime fixture content directory.
+
+Route checks: [return to the root](route:index) or [open the nested leaf](route:entries:branch:leaf).
+
+![Runtime marker](asset:icons/runtime-marker.svg)

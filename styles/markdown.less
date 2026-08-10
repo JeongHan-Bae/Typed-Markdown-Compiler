@@ -1,0 +1,173 @@
+/* Stable Markdown and normalized-AST rendering contract. */
+.prose {
+  font-size: @prose-font-size;
+}
+
+.prose > :first-child {
+  margin-top: 0;
+}
+
+.prose p,
+.prose ul,
+.prose ol,
+.prose blockquote,
+.prose pre,
+.prose .table-scroll {
+  margin: 1.2rem 0;
+}
+
+.prose ul,
+.prose ol {
+  padding-left: 1.5rem;
+}
+
+.prose li + li {
+  margin-top: 0.45rem;
+}
+
+.prose blockquote {
+  border-left: 3px solid @accent;
+  padding: 0.4rem 1.35rem;
+  color: @muted-ink;
+}
+
+.prose pre {
+  overflow-x: auto;
+  border: 1px solid @line;
+  background: @code;
+  padding: 1rem 1.2rem;
+  font-family: @code-font;
+  font-size: @code-block-font-size;
+  line-height: 1.55;
+}
+
+.prose :not(pre) > code {
+  border: 1px solid @line;
+  background: @code;
+  padding: 0.12em 0.3em;
+  font-family: @code-font;
+  font-size: @inline-code-font-size;
+}
+
+.prose hr {
+  border: 0;
+  border-top: 1px solid @line;
+  margin: 2.5rem 0;
+}
+
+.prose img {
+  display: block;
+  max-width: var(--content-image-max-width);
+  height: auto;
+  margin: 1rem 0;
+}
+
+.prose .image-paragraph {
+  text-align: center;
+}
+
+.prose .image-paragraph img {
+  margin-inline: auto;
+}
+
+.prose .image-paragraph--mixed {
+  text-align: left;
+}
+
+.prose .image-paragraph--mixed img {
+  margin-inline: 0;
+}
+
+.prose .content-alignment {
+  margin: 1.2rem 0;
+}
+
+.prose .content-alignment--left,
+.prose .content-alignment--left .image-paragraph {
+  text-align: left;
+}
+
+.prose .content-alignment--center,
+.prose .content-alignment--center .image-paragraph {
+  text-align: center;
+}
+
+.prose .content-alignment--right,
+.prose .content-alignment--right .image-paragraph {
+  text-align: right;
+}
+
+.prose .content-alignment--left .image-paragraph img {
+  margin-left: 0;
+  margin-right: auto;
+}
+
+.prose .content-alignment--center .image-paragraph img {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.prose .content-alignment--right .image-paragraph img {
+  margin-left: auto;
+  margin-right: 0;
+}
+
+.prose ruby {
+  ruby-position: over;
+}
+
+.prose rt {
+  color: @accent-dark;
+  font-size: 0.58em;
+}
+
+.task-checkbox {
+  flex: 0 0 auto;
+  margin: 0.45rem 0 0;
+  accent-color: @accent;
+}
+
+.task-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.task-item__content {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.task-item__content > :first-child {
+  margin-top: 0;
+}
+
+.task-item__content > :last-child {
+  margin-bottom: 0;
+}
+
+.table-scroll {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: @ui-font;
+  font-size: @table-font-size;
+}
+
+th,
+td {
+  border-bottom: 1px solid @table-border-color;
+  padding: @table-cell-padding-block @table-cell-padding-inline;
+  text-align: left;
+}
+
+th {
+  background: @table-header-background;
+  color: @table-header-color;
+  font-size: @table-header-font-size;
+  letter-spacing: @table-header-letter-spacing;
+  text-transform: uppercase;
+}
