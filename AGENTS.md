@@ -12,6 +12,8 @@ The generated site must run without a server-side runtime or browser-side Markdo
 - Node.js for parsing, resolving, Less compilation, Vue SSR, and static output.
 - Vue 3 and `@vue/server-renderer` at build time only.
 - Unified/Remark for Markdown parsing and GitHub Flavored Markdown syntax.
+- `remark-frontmatter` for YAML frontmatter recognition at the input boundary.
+- `parse5` for DOM-tree parsing of raw HTML nodes that Unified/Remark identifies.
 - Less for the editable theme and stable Markdown rendering contract.
 - UTF-8 for source, content, templates, and generated output. English is the default site language; multilingual content must remain possible.
 
@@ -21,8 +23,9 @@ The compiler keeps source content, normalized structure, route resolution, and f
 
 ```text
 Markdown and frontmatter
+  -> LexerToken[]
   -> normalized TypeScript AST
-  -> content and route resolver
+  -> JSON-like IR
   -> typed Vue VNodes
   -> Vue SSR during the Node build
   -> static HTML, CSS, and copied assets
@@ -30,7 +33,10 @@ Markdown and frontmatter
 
 Rules:
 
-- Keep Markdown to normalized AST to HTML as separate stages. Do not replace the AST pipeline with a direct Markdown-to-HTML shortcut.
+- Keep Markdown to LexerToken[] to normalized AST to JSON-like IR to Vue VNodes to HTML as separate stages. Do not replace the pipeline with a direct Markdown-to-HTML shortcut.
+- Delegate Markdown, GFM, frontmatter, and code recognition to Unified/Remark in the scanner/parser adapter. When Unified/Remark identifies a raw HTML node, keep it on a separate HTML path and parse it directly into a DOM tree with `parse5`; never flatten that node to text and send it back through Markdown parsing. Convert the DOM tree into the local recursive HTML token tree, then apply the local whitelist normalizer. Keep the local token, normalized AST, IR, and code-generator contracts and middle-stage transformations in this repository.
+- Keep token, AST, IR, and code-generator contracts in definition files separate from scanner, parser, lowering, and code-generator implementations. Implementation stages may consume the contracts; contracts must not import Vue or depend on implementation modules.
+- Keep `docs/syntax.md` focused on authoring syntax and output behavior. Keep compiler stages, contracts, and repository structure in `docs/architecture.md`; keep setup and workflows in `docs/quickstart.md`.
 - Pass user content through typed Vue VNodes so Vue SSR escapes text and attributes. Raw HTML must never become the core extension mechanism.
 - Prefer existing typed package APIs and explicit `unknown` validation over `any`.
 - Keep the four generic Vue page components (`page`, `list`, `list-object`, and `list-object-list`) in `src/renderer/vue/templates.ts`.
@@ -68,11 +74,16 @@ dev/
   launcher.sh               Local build and Vite preview entrypoint.
   rt-test.sh                Isolated runtime smoke test.
 public/assets/              Browser-renderable source assets.
+docs/                       Architecture, authoring, and Markdown syntax documentation.
 src/
   ast/                      Normalized AST and public domain types.
-  parser/                   Markdown and frontmatter parsing.
+  tokens/                   Lexer token contracts and source spans.
+  compiler/                  Unified/Remark syntax adapter, HTML DOM parser, and token boundary.
+  parser/                   Local token/syntax adapter to normalized AST.
+  ir/                       JSON-like IR contracts and AST lowering.
+  codegen/                  Code generator contracts and Vue VNode generator.
   resolver/                 Content discovery, routes, collections, and assets.
-  renderer/vue/             AST-to-VNode rendering and page components.
+  renderer/vue/             Static page chrome and page components.
   renderer/template-renderer.ts
                             Vue SSR entrypoint.
   build.ts                  Less, asset copy, route render, and output orchestration.
@@ -80,7 +91,10 @@ styles/
   markdown.less             Stable Markdown and AST rendering contract.
   theme.less                Editable visual theme and site chrome.
   site.less                 Less import boundary.
-test/                       Focused parser, renderer, configuration, and build tests.
+test/
+  features/                 Syntax fixtures and expected cross-stage compiler behavior.
+                            Static compiler-stage tests consume these fixtures.
+                            Dynamic runtime fixtures and checks belong under `dev/`.
 CONTRIBUTING.md             Commit and pull request requirements.
 .github/workflows/deploy.yml
                             GitHub Pages build and deploy workflow.
@@ -88,11 +102,13 @@ CONTRIBUTING.md             Commit and pull request requirements.
 
 ### Content And Route Ownership
 
-- `content/index.md` maps to the root route; `index.md` inside a directory owns that directory route.
+- `content/index.md` maps to the root route and is not implicitly a list; `index.md` inside a directory owns that directory route and is implicitly its list head.
+- A top-level directory index such as `content/blogs/index.md` is implicitly a list head for `blogs/`, is a root-navigation route named `blogs`, and is not an item in the parent collection. Deeper indexes such as `blogs/series/index.md` implicitly list `blogs/series/`, own their nested route, and are collection heads, not items. Non-root directory indexes must not declare `type: page` or any explicit `source`.
 - A document title comes from YAML `title`, its first level-one heading, or its file name in that order.
 - Internal links use colon-separated logical route names such as `route:blog` and `route:blogs:series:first-step` until the resolver maps them to root-relative slash paths.
 - The root `index` route also accepts the empty route name and `home` alias.
-- For a list, declare `type: list` and `source: <directory>/`; the page structure is inferred from the path and list declarations. Frontmatter does not select a page template.
+- For an external list head, declare `type: list` and `source: <directory>/`; the file name may give the collection the same user-facing root name or a different one. A non-root directory `index.md` is instead an implicit list head for its containing directory and can only use that directory's name. The page structure is inferred from the path and list declarations. Frontmatter does not select a page template.
+- An external list page declared with `source: blogs/`—whether its file is `blogs.md` or `blog.md`—conflicts with `blogs/index.md` when that directory index is also present; one source directory has one canonical collection head. `indexed` ordering applies independently to root navigation and each direct collection-item level, while index heads are excluded from item lists.
 
 ### Generated Site And GitHub Pages
 
@@ -107,30 +123,37 @@ CONTRIBUTING.md             Commit and pull request requirements.
 
 The project turns author-managed Markdown into a complete static site:
 
-- Markdown and YAML frontmatter are parsed into a normalized AST.
+- Markdown and YAML frontmatter are scanned into lexer tokens and parsed into a normalized AST.
+- The normalized AST is lowered into JSON-like IR before the Vue code generator creates VNodes.
 - Recursive content discovery derives routes, navigation, and list relationships from paths and metadata.
 - Assets are validated, copied, and emitted as root-relative URLs.
-- Vue renders typed AST VNodes during the build; the browser does not parse Markdown.
+- Vue renders typed VNodes generated from IR during the build; the browser does not parse Markdown.
 - Less compiles the editable theme and the stable Markdown rendering contract into one stylesheet.
 
 ### Frontmatter And Publication
 
 - Supported page metadata is `title`, `description`, `type`, `source`, `date`, `tags`, `indexed`, and `draft`.
-- `type` defaults to `page`; `source` is required for a `list` page.
+- `type` defaults to `page`; an explicit `type: list` page outside a non-root directory index requires `source`, while a non-root directory `index.md` is implicitly a list for its containing directory, may omit `type`, and must not declare `source`.
 - `draft` defaults to `false`; `draft: true` excludes the document from routes, collections, and generated HTML.
 - `indexed` is optional numeric display order. Indexed entries sort ascending, including `0`, before unindexed entries; unindexed entries sort alphabetically by title, then source path.
 - Unknown frontmatter fields are ignored.
 
 ### Markdown And AST Rules
 
-- Add or extend a normalized AST node in `src/ast/types.ts` before changing parser or renderer behavior.
-- Convert parser output into that node in `src/parser/markdown-parser.ts`.
-- Render the node as typed VNodes in `src/renderer/vue/ast-renderer.ts`.
+- Add or extend the normalized AST contract in `src/ast/types.ts` before changing parser behavior, and update the corresponding IR/code-generator contracts when the rendered shape changes.
+- Convert token output into that node in `src/parser/parser.ts`.
+- Lower the node into IR in `src/ir/ast-to-ir.ts`, then generate typed VNodes in `src/codegen/vue-code-generator.ts`.
+- Treat `src/compiler/remark-syntax.ts` as the external source-recognition boundary; do not hand-parse Markdown delimiters or angle-bracket context in the local scanner.
+- Treat a Remark raw HTML node as a separate DOM input. `parse5` produces the recursive HTML tree stored in the local token payload; the AST parser consumes that tree and never reparses its original HTML string as Markdown.
 - Markdown headings and native `<h1>` through `<h5>` blocks must produce the same `HeadingNode` shape, preserving depth.
 - Image-only paragraphs are centered by default. Images mixed with text remain left-aligned by default.
 - Preserve native authoring alignment with `<div align="left|center|right">` or equivalent `text-align` style wrappers. Supported wrappers become typed content-alignment AST/VNodes; other raw HTML remains escaped.
-- Image sizing declarations are typed Markdown extensions: `{max-width=30%}` changes the cap, while `{width=25%}` forces the rendered width. Without a declaration, use the `CONTENT_IMAGE_MAX_WIDTH_PERCENT` default and intrinsic image size.
+- Image sizing declarations are typed Markdown extensions: `{max-width=30%}` changes the cap, while `{width=25%}` forces the rendered width. Whitelisted HTML images accept the corresponding numeric `vw` form (`max-width: 30vw` or `width: 25vw`) and normalize it to the same AST/IR semantics. Without a declaration, use the `CONTENT_IMAGE_MAX_WIDTH_PERCENT` default and intrinsic image size.
 - Treat `asset:...` links and images as validated web-image references into `public/assets/`. Preserve nested asset names, reject traversal and unsupported extensions, and emit root-relative `/assets/...` URLs.
+- Ordinary external image URLs such as `https://...` are allowed and remain external `src` values; unsafe URL schemes remain rejected by the IR boundary.
+- HTML equivalents of supported Markdown constructs are a whitelist. Supported tags normalize to the same AST/IR semantics as Markdown; unsupported tags and image sizing units other than the supported HTML `%`/`vw` forms remain escaped text.
+- The HTML whitelist includes alignment `div`, `h1` through `h5`, block containers, `img`, `ruby`/`rt`, `br`, `a`, and inline aliases `strong`/`b`, `em`/`i`, `del`/`s`/`strike`, and `code`/`tt`; HTML comments are discarded.
+- Fenced code uses matching backticks or tildes of at least three characters. A four-character outer fence is the supported shell for literal inner three-character fences; language-marked and plain fences remain distinct AST/codegen cases.
 
 ### Identity, Attribution, And Footer
 
@@ -169,7 +192,7 @@ The project turns author-managed Markdown into a complete static site:
 
 - Keep the four generic Vue page components in `src/renderer/vue/templates.ts`.
 - Keep Vue as a build-time SSR dependency; no client-side Vue runtime or application JavaScript may be emitted.
-- Keep content rendering at the AST-to-VNode boundary. Do not inject raw Markdown or arbitrary raw HTML into templates.
+- Keep content rendering at the AST-to-IR-to-VNode boundaries. Do not inject raw Markdown or arbitrary raw HTML into templates.
 - Header navigation, breadcrumbs, GitHub action, avatar, and optional footer belong to the static page chrome.
 
 ### Less And Theme Rules
@@ -182,6 +205,9 @@ The project turns author-managed Markdown into a complete static site:
 ### Testing And Verification Rules
 
 - Add a focused test under `test/` for each parser, AST, renderer, configuration, or build behavior change.
+- Keep cross-stage syntax fixtures in `test/features/`; static compiler-stage tests consume them. Each feature should assert the token tree, normalized AST, JSON-like IR, Vue VNode projection, and SSR HTML expected for the same source; include each documented syntax object in isolation and in mixed/nested outer-and-inner Markdown/HTML combinations, plus negative features for rejected or escaped input. `test/features/indexed-routes.ts` also covers root indexes, directory indexes, indexed zero, mixed indexed/unindexed items, nested indexes, same-name and different-name external list heads, and the conflicting external-head layout. Dynamic site tests and disposable runtime fixtures belong under `dev/`; `dev/rt-test/fixtures/content/syntax.md` and `dev/rt-test.sh` must exercise the documented positive syntax in an actual generated page, while the draft fixture must prove excluded routes stay unavailable.
+- Treat `docs/syntax.md` as a tested contract. Whenever syntax is added or changed, update the matching `test/features/` source and expected data, then update or add the focused test that proves the behavior. A syntax description may remain in `docs/syntax.md` only when its feature data exists and the test passes.
+- A failing syntax test is evidence that the implementation or its expected semantic output is incomplete. Do not delete tests, remove coverage, weaken assertions, skip cases, or otherwise hide a failure to make the suite pass; fix the implementation or correct the expected data to match the intentional contract.
 - Test runtime behavior with disposable fixtures through `CONTENT_DIRECTORY` and `PUBLIC_DIRECTORY` overrides.
 - Keep test content and rendered-output assertions independent from clone-specific usernames, full names, avatars, and repository names.
 - Before handoff, run the type checker, tests, static build, and runtime smoke test when the change affects build or rendering.

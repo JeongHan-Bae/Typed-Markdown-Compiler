@@ -9,18 +9,18 @@ import type {
   SiteConfig
 } from "../../ast/types.ts";
 import type { RouteResolver } from "../../resolver/route-resolver.ts";
+import { lowerAstToIr } from "../../ir/ast-to-ir.ts";
+import { vueCodeGenerator } from "../../codegen/vue-code-generator.ts";
 import {
   renderGithubAvatar,
   renderGithubFollowLink
 } from "../../plugins/github-follow-link.ts";
 import {
   renderAdjacentLink,
-  renderAst,
   renderBreadcrumbs,
   renderNavigationLinks,
-  renderTags,
-  type VueAstRenderContext
-} from "./ast-renderer.ts";
+  renderTags
+} from "./page-chrome.ts";
 
 export interface TemplateProps {
   config: SiteConfig;
@@ -96,11 +96,13 @@ function renderDocument(props: TemplateProps, options: ContentOptions): VNode {
   const pageShellStyle = "--content-image-max-width: "
     + CONTENT_IMAGE_MAX_WIDTH_PERCENT
     + "%";
-  const astContext: VueAstRenderContext = {
-    resolver: props.resolver,
-    collections: props.collections,
-    assetHref: props.assetHrefForName
-  };
+  const contentIr = lowerAstToIr(input.document.ast, {
+    routeHref: (name) => props.resolver.href(name),
+    relativeHref: (path) => props.resolver.hrefForRelative(path),
+    assetHref: props.assetHrefForName,
+    collections: props.collections
+  });
+  const contentVNodes = vueCodeGenerator.generate(contentIr);
   const githubAvatar = renderGithubAvatar(config.githubUsername, props.githubAvatarHref);
   const githubLink = renderGithubFollowLink(config.githubUsername);
   const navigation = h(
@@ -150,7 +152,7 @@ function renderDocument(props: TemplateProps, options: ContentOptions): VNode {
       h(
         "main",
         { class: "page-shell", style: pageShellStyle },
-        [renderContentPage(props, options, astContext)]
+        [renderContentPage(props, options, contentVNodes)]
       ),
       footer
     ])
@@ -160,7 +162,7 @@ function renderDocument(props: TemplateProps, options: ContentOptions): VNode {
 function renderContentPage(
   props: TemplateProps,
   options: ContentOptions,
-  astContext: VueAstRenderContext
+  contentVNodes: ReturnType<typeof vueCodeGenerator.generate>
 ): VNode {
   const metadata = props.input.document.metadata;
   const introChildren: VNode[] = [
@@ -170,7 +172,7 @@ function renderContentPage(
 
   const contentChildren: VNode[] = [
     h("header", { class: "page-intro" }, introChildren),
-    h("div", { class: "prose" }, renderAst(props.input.document.ast, astContext))
+    h("div", { class: "prose" }, contentVNodes)
   ];
 
   if (options.includeTags) {

@@ -3,16 +3,33 @@ import test from "node:test";
 import { renderToString } from "@vue/server-renderer";
 import { h } from "vue";
 import { siteConfig } from "../config.ts";
-import { parseMarkdown } from "../src/parser/markdown-parser.ts";
-import { renderAst } from "../src/renderer/vue/ast-renderer.ts";
+import { parseMarkdown } from "../src/parser/parser.ts";
+import { lowerAstToIr } from "../src/ir/ast-to-ir.ts";
+import { generateVueNodes } from "../src/codegen/vue-code-generator.ts";
 import { assetOutputPath, normalizeAssetName } from "../src/resolver/asset-resolver.ts";
 import {
   compareIndexedThenAlphabetical,
   discoverContent,
   RouteResolver
 } from "../src/resolver/route-resolver.ts";
-import type { RouteRecord } from "../src/ast/types.ts";
+import type { CollectionResult, RootNode, RouteRecord } from "../src/ast/types.ts";
 import { resolveCurrentGitEmail, resolveCurrentGithubUsername } from "./git-identity.ts";
+
+function renderContent(
+  ast: RootNode,
+  context: {
+    resolver: RouteResolver;
+    collections: ReadonlyMap<string, CollectionResult>;
+    assetHref: (name: string) => string;
+  }
+) {
+  return generateVueNodes(lowerAstToIr(ast, {
+    routeHref: (name) => context.resolver.href(name),
+    relativeHref: (path) => context.resolver.hrefForRelative(path),
+    assetHref: context.assetHref,
+    collections: context.collections
+  }));
+}
 
 const runtimeFixtureConfig = {
   ...siteConfig,
@@ -69,7 +86,7 @@ test("normalizes native alignment wrappers for text and images", async () => {
   assert.equal(alignmentNodes[1]?.children[0]?.type, "heading");
   assert.equal(alignmentNodes[2]?.children[0]?.type, "paragraph");
 
-  const html = await renderToString(h("div", null, renderAst(document.ast, {
+  const html = await renderToString(h("div", null, renderContent(document.ast, {
     resolver: new RouteResolver([], ""),
     collections: new Map(),
     assetHref: (name) => `/assets/${name}`
@@ -141,7 +158,7 @@ test("normalizes image sizing declarations and renders percentage styles", async
   assert.equal(forcedImage.forcedWidthPercent, 25);
   assert.equal(forcedImage.maxWidthPercent, undefined);
 
-  const html = await renderToString(h("div", null, renderAst(document.ast, {
+  const html = await renderToString(h("div", null, renderContent(document.ast, {
     resolver: new RouteResolver([], ""),
     collections: new Map(),
     assetHref: (name) => `/assets/${name}`
@@ -158,7 +175,7 @@ test("normalizes image sizing declarations and renders percentage styles", async
     "fixture/example.md",
     "example"
   );
-  const lineBreakHtml = await renderToString(h("div", null, renderAst(lineBreakDocument.ast, {
+  const lineBreakHtml = await renderToString(h("div", null, renderContent(lineBreakDocument.ast, {
     resolver: new RouteResolver([], ""),
     collections: new Map(),
     assetHref: (name) => "/assets/" + name
@@ -172,7 +189,7 @@ test("normalizes image sizing declarations and renders percentage styles", async
     "fixture/example.md",
     "example"
   );
-  const mixedHtml = await renderToString(h("div", null, renderAst(mixedDocument.ast, {
+  const mixedHtml = await renderToString(h("div", null, renderContent(mixedDocument.ast, {
     resolver: new RouteResolver([], ""),
     collections: new Map(),
     assetHref: (name) => `/assets/${name}`
@@ -249,7 +266,7 @@ test("converts every documented Markdown extension into static HTML", async () =
     title: "Home",
     aliases: ["", "home"]
   }], "");
-  const html = await renderToString(h("div", null, renderAst(document.ast, {
+  const html = await renderToString(h("div", null, renderContent(document.ast, {
     resolver,
     collections: new Map(),
     assetHref: (name) => "/assets/" + name
@@ -304,7 +321,7 @@ test("sorts indexed content before unindexed content", async () => {
   );
 
   const manifest = await discoverContent(process.cwd(), runtimeFixtureConfig);
-  assert.deepEqual(manifest.navigation, ["index", "about", "notes"]);
+  assert.deepEqual(manifest.navigation, ["index", "entries", "about", "notes", "syntax"]);
   assert.deepEqual(
     manifest.collections.get("entries")?.items.map((item) => item.routeName),
     ["entries:branch"]
@@ -380,7 +397,7 @@ test("resolves route links only at the Vue SSR boundary", async () => {
   }
   assert.deepEqual(linkTargets.at(-1), { type: "relative", href: "/feed.xml" });
 
-  const html = await renderToString(h("div", null, renderAst(document.ast, {
+  const html = await renderToString(h("div", null, renderContent(document.ast, {
     resolver,
     collections: new Map(),
     assetHref: (name) => `/assets/${name}`
@@ -398,7 +415,7 @@ test("resolves route links only at the Vue SSR boundary", async () => {
 test("escapes HTML-like input that is not a supported AST extension", async () => {
   const document = parseMarkdown("<script>alert('x')</script>", "fixture/example.md", "example");
   const resolver = new RouteResolver([], "");
-  const html = await renderToString(h("div", null, renderAst(document.ast, {
+  const html = await renderToString(h("div", null, renderContent(document.ast, {
     resolver,
     collections: new Map(),
     assetHref: (name) => `/assets/${name}`
@@ -449,7 +466,7 @@ test("supports colon-separated route names and asset targets", async () => {
   ], "");
   assert.equal(resolver.href("fixture:entries:branch:leaf"), "/fixture/entries/branch/leaf/");
 
-  const html = await renderToString(h("div", null, renderAst(document.ast, {
+  const html = await renderToString(h("div", null, renderContent(document.ast, {
     resolver,
     collections: new Map(),
     assetHref: (name) => `../../assets/${name}`
@@ -463,7 +480,7 @@ test("rejects unsafe and non-image asset targets", () => {
   const document = parseMarkdown("![bad](asset:../secret.txt)", "fixture/example.md", "example");
   const resolver = new RouteResolver([], "");
   assert.throws(
-    () => renderAst(document.ast, {
+    () => renderContent(document.ast, {
       resolver,
       collections: new Map(),
       assetHref: (name) => `/assets/${name}`
@@ -471,7 +488,7 @@ test("rejects unsafe and non-image asset targets", () => {
     /Unsafe asset path rejected/u
   );
   assert.throws(
-    () => renderAst(parseMarkdown("![bad](asset:icons/secret.txt)", "fixture/example.md", "example").ast, {
+    () => renderContent(parseMarkdown("![bad](asset:icons/secret.txt)", "fixture/example.md", "example").ast, {
       resolver,
       collections: new Map(),
       assetHref: (name) => "/assets/" + name

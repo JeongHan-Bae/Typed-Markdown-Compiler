@@ -76,7 +76,11 @@ source: blogs/
 ---
 ~~~
 
-Every published Markdown file under blogs/ becomes a collection item. A collection item can also declare type: list and its own source directory, which creates a nested list. A nested route such as blogs/series/first-step.md has the logical name blogs:series:first-step.
+Every published Markdown file under blogs/ other than directory index heads becomes a collection item. A collection item can also declare type: list and its own source directory, which creates a nested list. A nested route such as blogs/series/first-step.md has the logical name blogs:series:first-step.
+
+An external list head may use the same user-facing root name as its source directory (`blogs.md` with `source: blogs/`) or a different name (`blog.md` with `source: blogs/`).
+
+For a directory-owned collection head, use `blogs/index.md` (a directory index is implicitly a list of `blogs/`). It owns `/blogs/`, appears in root navigation when `blogs/` is top-level, and is not itself a collection item. A directory index can only use the directory's own root name. Do not set `type: page` or an explicit `source` on that index, and do not also create an external list head with `source: blogs/`; those heads conflict.
 
 Use indexed when order matters:
 
@@ -144,12 +148,11 @@ When `npm run dev` is used locally, the launcher inspects the Git remote. A GitH
 - Keep styles/markdown.less unchanged during normal theme work; it is the stable Markdown and AST rendering contract.
 - Keep styles/site.less as the import entrypoint for both Less layers.
 - Change document structure in src/renderer/vue/templates.ts.
-- Extend Markdown-to-AST conversion in src/parser/markdown-parser.ts.
-- Add AST rendering behavior in src/renderer/vue/ast-renderer.ts.
+- Read [Architecture](architecture.md) before changing compiler stages or their boundaries.
 - Add site and runtime integration values under constants/.
 - Add focused tests under test/.
 
-Keep the parser, normalized AST, Vue renderer, and static build as separate stages. Do not move Markdown parsing or application logic into the browser.
+The compiler boundaries and data contracts are documented in [Architecture](architecture.md). Markdown parsing and application logic stay in the Node build; they are not moved into the browser.
 
 ## Build and preview
 
@@ -177,4 +180,4 @@ Run the isolated runtime smoke test:
 npm run rt-test
 ~~~
 
-The runtime test uses disposable fixtures in dev/rt-test/fixtures/, checks every generated fixture page and its nested SVG asset, then stops Vite automatically. It does not read or modify the example content/.
+The runtime test uses disposable fixtures in dev/rt-test/fixtures/, checks every generated fixture page and its nested SVG asset, exercises the documented syntax page, verifies that the draft fixture is not routable, and then stops Vite automatically. It does not read or modify the example content/.

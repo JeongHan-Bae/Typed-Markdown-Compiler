@@ -34,6 +34,9 @@ test("copies nested public assets and emits root-relative route references", asy
   const asset = await readFile(join(rootDirectory, "dist/assets/icons/runtime-marker.svg"), "utf8");
   const indexHtml = await readFile(join(rootDirectory, "dist/index.html"), "utf8");
   const aboutHtml = await readFile(join(rootDirectory, "dist/about/index.html"), "utf8");
+  const syntaxHtml = await readFile(join(rootDirectory, "dist/syntax/index.html"), "utf8");
+  const entriesHtml = await readFile(join(rootDirectory, "dist/entries/index.html"), "utf8");
+  const seriesHtml = await readFile(join(rootDirectory, "dist/entries/series/index.html"), "utf8");
   const nestedHtml = await readFile(
     join(rootDirectory, "dist/entries/branch/leaf/index.html"),
     "utf8"
@@ -56,6 +59,13 @@ test("copies nested public assets and emits root-relative route references", asy
   assert.match(aboutHtml, /src="\/assets\/icons\/runtime-marker\.svg"/u);
   assert.match(aboutHtml, /alt="Runtime marker"[^>]*style="[^"]*max-width:\s*30%/u);
   assert.doesNotMatch(aboutHtml, /\{(?:max-width|width)=\d+(?:\.\d+)?%\}/u);
+  assert.match(syntaxHtml, /<h5>HTML H5<\/h5>/u);
+  assert.match(syntaxHtml, /<code>tt<\/code>/u);
+  assert.match(syntaxHtml, /&lt;script&gt;alert\(&quot;escaped&quot;\)&lt;\/script&gt;/u);
+  assert.match(entriesHtml, /href="\/entries\/branch\/"/u);
+  assert.match(entriesHtml, /href="\/entries\/series\/"/u);
+  assert.match(seriesHtml, /href="\/entries\/series\/first\/"/u);
+  assert.match(seriesHtml, /href="\/entries\/series\/second\/"/u);
   assert.match(nestedHtml, /href="\/"/u);
   assert.match(nestedHtml, /href="\/entries\/branch\/leaf\/"/u);
   assert.doesNotMatch(
@@ -66,14 +76,21 @@ test("copies nested public assets and emits root-relative route references", asy
     route.name === "entries:branch:leaf"
     && route.path === "/entries/branch/leaf/"
   )));
+  assert.ok(manifest.routes.some((route) => route.name === "syntax"));
+  assert.ok(!manifest.routes.some((route) => route.name === "draft"));
   assert.doesNotMatch(aboutHtml, /<script\b/u);
 
   const renderedPages = [
     "index.html",
     "about/index.html",
     "notes/index.html",
+    "entries/index.html",
     "entries/branch/index.html",
-    "entries/branch/leaf/index.html"
+    "entries/branch/leaf/index.html",
+    "entries/series/index.html",
+    "entries/series/first/index.html",
+    "entries/series/second/index.html",
+    "syntax/index.html"
   ];
   for (const pagePath of renderedPages) {
     const html = await readFile(join(rootDirectory, "dist", pagePath), "utf8");

@@ -19,6 +19,8 @@
   "dependencies": {
     "@vue/server-renderer": "^3.5.41",
     "less": "^4.2.0",
+    "parse5": "^7.3.0",
+    "remark-frontmatter": "^5.0.0",
     "remark-gfm": "^4.0.0",
     "remark-parse": "^11.0.0",
     "unified": "^11.0.5",

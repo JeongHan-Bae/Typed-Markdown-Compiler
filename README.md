@@ -1,6 +1,6 @@
 # Typed Markdown Compiler
 
-This repository is a Vue 3 template for compiling Markdown into a static website. Every Markdown file is parsed into a normalized TypeScript AST before Vue SSR produces HTML. Vue, the Markdown parser, and the compiler are build-time dependencies; they are not shipped to the browser.
+This repository is a Vue 3 template for compiling Markdown into a static website. Unified/Remark recognizes the Markdown source at the input boundary, after which every document flows through this project's tokens, normalized TypeScript AST, JSON-like IR, and Vue SSR before producing HTML. Vue, the Markdown parser, and the compiler are build-time dependencies; they are not shipped to the browser.
 
 The default document language is English, while multilingual Markdown content remains supported.
 
@@ -12,8 +12,9 @@ Markdown in `content/` is compiled into static HTML during the build. You can wr
 
 ## Documentation
 
-- [Quickstart](quickstart.md) covers installation, authoring, configuration, testing, and deployment.
-- [Markdown syntax](syntax.md) defines frontmatter, routes, collections, assets, images, and supported blocks.
+- [Quickstart](docs/quickstart.md) covers installation, authoring, configuration, testing, and deployment.
+- [Markdown syntax](docs/syntax.md) defines frontmatter, routes, collections, assets, images, and supported blocks.
+- [Architecture](docs/architecture.md) defines the compiler stages, data contracts, and repository structure.
 - [AGENTS.md](AGENTS.md) records the engineering rules and architecture boundaries.
 - [CONTRIBUTING.md](CONTRIBUTING.md) defines commit and pull request requirements.
 
@@ -32,12 +33,13 @@ The generated site is written to dist/. Deploy that directory to GitHub Pages, C
 
 - content/ contains the example Markdown site.
 - public/assets/ contains browser-renderable source assets.
-- src/ contains the parser, normalized AST, route resolver, Vue renderer, and build pipeline.
+- src/ contains lexer token definitions and scanning, parsing, the normalized AST, JSON-like IR, Vue code generation, route resolution, and the build pipeline.
 - styles/theme.less contains the editable colors, font families, font sizes, spacing, site chrome, and responsive theme rules.
 - styles/markdown.less contains the stable Markdown and AST rendering contract. Leave it unchanged for ordinary theme customization.
 - styles/site.less is the Less entrypoint that imports both layers.
 - constants/ contains typed site and runtime values.
 - dev/ contains compiler, launcher, and isolated runtime-test entrypoints.
+- test/features/ contains the syntax contract fixtures and cross-stage static compiler tests; dynamic runtime fixtures remain under dev/.
 - dist/ contains generated output and is never edited by hand.
 
 ## Commands

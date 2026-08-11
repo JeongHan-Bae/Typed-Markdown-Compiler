@@ -16,7 +16,7 @@ import type {
   SiteConfig,
   SourceDocument
 } from "../ast/types.ts";
-import { parseMarkdownFile } from "../parser/markdown-parser.ts";
+import { parseMarkdownFile } from "../parser/parser.ts";
 
 export interface ContentManifest {
   documents: Map<string, SourceDocument>;
@@ -116,7 +116,7 @@ export async function discoverContent(
 
   const collections = createCollections(routes, documents);
   const navigation = routes
-    .filter((route) => isRootContentRoute(route.sourcePath))
+    .filter((route) => isRootContentRoute(route))
     .sort(compareIndexedThenAlphabetical)
     .map((route) => route.name);
 
@@ -177,6 +177,15 @@ function createCollections(
     const sourcePath = normalizeCollectionSource(document.metadata.listSource);
     if (sourcePath === null) {
       throw new Error(`List page ${route.sourcePath} must declare a source directory`);
+    }
+    const directoryIndex = routes.find(
+      (candidate) => candidate.sourcePath === `${sourcePath}/index.md`
+    );
+    if (directoryIndex !== undefined && directoryIndex.sourcePath !== route.sourcePath) {
+      throw new Error(
+        `List page ${route.sourcePath} conflicts with directory index `
+        + `${directoryIndex.sourcePath} for collection source ${sourcePath}`
+      );
     }
     if (collections.has(sourcePath)) {
       throw new Error(`Multiple list pages declare the same source directory: ${sourcePath}`);
@@ -374,8 +383,8 @@ function toNavigationLink(
   };
 }
 
-function isRootContentRoute(sourcePath: string): boolean {
-  return !sourcePath.includes("/");
+function isRootContentRoute(route: RouteRecord): boolean {
+  return route.name.split(ROUTE_SEGMENT_SEPARATOR).length === 1;
 }
 
 export function compareIndexedThenAlphabetical(

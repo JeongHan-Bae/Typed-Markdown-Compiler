@@ -1,8 +1,6 @@
 ---
 title: Runtime notes
-description: A fixture collection index.
-type: list
-source: entries/
+description: A fixture page alongside the canonical entries index.
 ---
 
 # Runtime notes

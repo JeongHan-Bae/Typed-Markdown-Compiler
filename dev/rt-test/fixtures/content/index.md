@@ -17,3 +17,19 @@ External checks: [HTTPS](https://example.com), [email](mailto:runtime@example.co
 | Syntax | Result |
 | --- | --- |
 | Table | Static HTML |
+
+## Native HTML and fenced code
+
+<div align="center"><p><strong>HTML strong</strong> <tt>HTML tt</tt></p><ul><li>outer<ul><li>inner</li></ul></li></ul></div>
+
+<script>alert("escaped")</script>
+
+~~~~markdown
+```ts
+const runtime: string = "language-marked";
+```
+
+~~~
+plain runtime code
+~~~
+~~~~
