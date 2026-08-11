@@ -1,6 +1,34 @@
 # Markdown Syntax
 
+`typed-markdown-compiler` is a TypeScript Markdown-to-static-HTML compiler. This repository is also a reusable template repository: its checked-in `content/` and `public/assets/` are the default example inputs. The build pipeline parses and normalizes Markdown during the Node build, then emits static HTML, CSS, and assets under `dist/`; the deployed site does not contain the compiler, Vue runtime, Markdown parser, or a server-side runtime.
+
+The example is intentionally shaped like a personal blog, with a home page, an about page, a field-notes collection, and posts. That is an example site and a recommended use case, not the identity of the project. The project is the compiler and can render other Markdown sites.
+
+## Default example routes
+
+The current checked-in input renders the following local routes and GitHub Pages URLs:
+
+| Input | Local generated route | Current example URL |
+| --- | --- | --- |
+| `content/index.md` | `/` | [`https://jeonghan-bae.github.io/Typed-Markdown-Compiler/`](https://jeonghan-bae.github.io/Typed-Markdown-Compiler/) |
+| `content/about.md` | `/about/` | [`https://jeonghan-bae.github.io/Typed-Markdown-Compiler/about/`](https://jeonghan-bae.github.io/Typed-Markdown-Compiler/about/) |
+| `content/blog.md` | `/blog/` | [`https://jeonghan-bae.github.io/Typed-Markdown-Compiler/blog/`](https://jeonghan-bae.github.io/Typed-Markdown-Compiler/blog/) |
+| `content/blogs/hello-world.md` | `/blogs/hello-world/` | [`https://jeonghan-bae.github.io/Typed-Markdown-Compiler/blogs/hello-world/`](https://jeonghan-bae.github.io/Typed-Markdown-Compiler/blogs/hello-world/) |
+| `content/blogs/typed-ast.md` | `/blogs/typed-ast/` | [`https://jeonghan-bae.github.io/Typed-Markdown-Compiler/blogs/typed-ast/`](https://jeonghan-bae.github.io/Typed-Markdown-Compiler/blogs/typed-ast/) |
+| `public/assets/icons/syntax-marker.svg` | `/assets/icons/syntax-marker.svg` | [`https://jeonghan-bae.github.io/Typed-Markdown-Compiler/assets/icons/syntax-marker.svg`](https://jeonghan-bae.github.io/Typed-Markdown-Compiler/assets/icons/syntax-marker.svg) |
+
+Running `npm run build` locally produces the same route structure with no repository prefix. The GitHub Pages workflow sets the repository name as the base path, so the default project-site URL for this repository is `https://jeonghan-bae.github.io/Typed-Markdown-Compiler/`. When the repository is copied through **Use this template**, the new repository's owner and name determine its own project-site URL and generated link prefix.
+
 This compiler accepts Markdown with YAML frontmatter and a small set of typed extensions. Each syntax form below describes the source form it accepts and the static HTML behavior it produces.
+
+## Default input locations
+
+For the built-in example, edit these locations:
+
+- `content/`: Markdown documents. File paths become logical routes and published HTML pages.
+- `public/assets/`: browser-renderable assets. An `asset:...` reference is copied to `dist/assets/` and emitted as a root-relative URL.
+
+The build's `CONTENT_DIRECTORY` and `PUBLIC_DIRECTORY` environment variables can point to other input roots for a customized site or disposable fixture. The default template still uses `content/` and `public/` as the build roots, with its authored browser assets in `public/assets/`.
 
 ## Frontmatter
 

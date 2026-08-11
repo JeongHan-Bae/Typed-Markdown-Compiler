@@ -2,9 +2,6 @@
 set -Eeuo pipefail
 
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
-HOST="${RT_TEST_HOST:-127.0.0.1}"
-PORT="${RT_TEST_PORT:-4174}"
-BASE_URL="http://${HOST}:${PORT}"
 TEST_CONTENT_DIRECTORY="${RT_TEST_CONTENT_DIRECTORY:-dev/rt-test/fixtures/content}"
 TEST_PUBLIC_DIRECTORY="${RT_TEST_PUBLIC_DIRECTORY:-dev/rt-test/fixtures/public}"
 STARTUP_ATTEMPTS=60
@@ -49,6 +46,14 @@ assert_page() {
 
   case "$path" in
     /)
+      if [[ -n "${RT_TEST_EXPECTED_SITE_TITLE:-}" ]]; then
+        [[ "$body" == *"<title>Runtime home | ${RT_TEST_EXPECTED_SITE_TITLE}</title>"* ]] \
+          || fail "$path does not contain the expected site title"
+      fi
+      if [[ -n "${RT_TEST_EXPECTED_FOOTER_TEXT:-}" ]]; then
+        [[ "$body" == *"${RT_TEST_EXPECTED_FOOTER_TEXT}"* ]] \
+          || fail "$path does not contain the expected footer text"
+      fi
       printf '%s' "$body" | grep -Eq 'alt="Runtime marker"[^>]*style="[^"]*width:[[:space:]]*25%;[^"]*max-width:[[:space:]]*100%' \
         || fail "$path does not force the declared 25% image width"
       [[ "$body" == *'href="https://example.com"'* ]] \
@@ -147,10 +152,27 @@ assert_page() {
 trap cleanup EXIT INT TERM
 
 cd "$ROOT_DIR"
+
+if [ -n "${RT_TEST_ENV_FILE:-}" ]; then
+  export ENV_FILE="$RT_TEST_ENV_FILE"
+  unset ENV_DIRECTORY
+elif [ -n "${RT_TEST_ENV_DIRECTORY:-}" ]; then
+  export ENV_DIRECTORY="$RT_TEST_ENV_DIRECTORY"
+  unset ENV_FILE
+else
+  export ENV_FILE="$ROOT_DIR/dev/rt-test/fixtures/env/empty.env"
+  unset ENV_DIRECTORY
+fi
+
 CONTENT_DIRECTORY="$TEST_CONTENT_DIRECTORY" \
 PUBLIC_DIRECTORY="$TEST_PUBLIC_DIRECTORY" \
 VITE_BASE_PATH="" \
   "$ROOT_DIR/dev/compiler.sh"
+
+eval "$(node --import=tsx "$ROOT_DIR/dev/export-env.ts")"
+HOST="${RT_TEST_HOST:-${HOST:-127.0.0.1}}"
+PORT="${RT_TEST_PORT:-${PORT:-4174}}"
+BASE_URL="http://${HOST}:${PORT}"
 
 (
   cd "$ROOT_DIR"

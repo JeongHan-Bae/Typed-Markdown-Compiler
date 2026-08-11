@@ -1,7 +1,8 @@
+import { resolveEnvironment } from "./constants/environment.ts";
 import type { SiteConfig } from "./src/ast/types.ts";
 import { resolveConstants } from "./constants/site.ts";
 
-const constants = resolveConstants(process.env);
+const constants = resolveConstants(resolveEnvironment(process.env));
 
 export const siteConfig: SiteConfig = {
   language: "en",

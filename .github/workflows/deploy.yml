@@ -52,7 +52,10 @@ jobs:
           FOOTER_TEXT: ""
           VITE_BASE_PATH: ""
           GITHUB_REPOSITORY_NAME: ""
+          ENV_FILE: dev/rt-test/fixtures/env/empty.env
+          ENV_DIRECTORY: ""
         run: |
+          npm run check:unused
           npm test
           npm run rt-test
 

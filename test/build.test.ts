@@ -25,6 +25,7 @@ test("copies nested public assets and emits root-relative route references", asy
         GITHUB_USERNAME: "",
         FOOTER_TEXT: "",
         VITE_BASE_PATH: "",
+        ENV_FILE: "dev/rt-test/fixtures/env/empty.env",
         CONTENT_DIRECTORY: "dev/rt-test/fixtures/content",
         PUBLIC_DIRECTORY: "dev/rt-test/fixtures/public"
       }
@@ -111,6 +112,7 @@ test("copies nested public assets and emits root-relative route references", asy
         GITHUB_USERNAME: "",
         FOOTER_TEXT: "",
         VITE_BASE_PATH: "/fixture-site/",
+        ENV_FILE: "dev/rt-test/fixtures/env/empty.env",
         CONTENT_DIRECTORY: "dev/rt-test/fixtures/content",
         PUBLIC_DIRECTORY: "dev/rt-test/fixtures/public"
       }
@@ -140,6 +142,7 @@ test("copies nested public assets and emits root-relative route references", asy
         GITHUB_USERNAME: "",
         FOOTER_TEXT: "nil",
         VITE_BASE_PATH: "",
+        ENV_FILE: "dev/rt-test/fixtures/env/empty.env",
         CONTENT_DIRECTORY: "dev/rt-test/fixtures/content",
         PUBLIC_DIRECTORY: "dev/rt-test/fixtures/public"
       }
@@ -148,6 +151,31 @@ test("copies nested public assets and emits root-relative route references", asy
   const footerlessHtml = await readFile(join(rootDirectory, "dist/index.html"), "utf8");
   assert.doesNotMatch(footerlessHtml, /site-footer/u);
   assert.doesNotMatch(footerlessHtml, /built by /u);
+});
+
+test("uses non-empty values from a selected dotenv file", async () => {
+  await execFileAsync(
+    process.execPath,
+    ["--import=tsx", "src/build.ts"],
+    {
+      cwd: rootDirectory,
+      env: {
+        ...process.env,
+        ENV_FILE: "dev/rt-test/fixtures/env/override.env",
+        SITE_TITLE: "Process title should lose",
+        FOOTER_TEXT: "Process footer should lose",
+        VITE_BASE_PATH: "/process-base/",
+        CONTENT_DIRECTORY: "missing-content",
+        PUBLIC_DIRECTORY: "missing-public"
+      }
+    }
+  );
+
+  const indexHtml = await readFile(join(rootDirectory, "dist/index.html"), "utf8");
+  assert.match(indexHtml, /<title>Runtime home \| Dotenv fixture site<\/title>/u);
+  assert.match(indexHtml, /href="\/process-base\/"/u);
+  assert.match(indexHtml, /href="\/process-base\/assets\/site\.css"/u);
+  assert.match(indexHtml, /Dotenv fixture footer/u);
 });
 
 function escapeRegExp(value: string): string {

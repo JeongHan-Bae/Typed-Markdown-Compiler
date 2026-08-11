@@ -16,6 +16,7 @@ Clone the repository, install dependencies, and run the checks:
 ~~~bash
 npm install
 npm run check
+npm run check:unused
 npm test
 ~~~
 
@@ -117,9 +118,37 @@ Site values can be overridden during a build:
 
 ~~~bash
 SITE_TITLE="Personal Blog" \
-GITHUB_USERNAME="your-name" \
 FOOTER_TEXT="Published from Markdown" \
 npm run build
+~~~
+
+The repository includes a root `.env` file containing only four user-facing keys, all set to an empty string. The compiler parses it with the `dotenv` library. For these four keys only, a non-empty file value takes precedence over the same process variable. An empty file value does nothing, so the process variable and then the compiler's existing resolution/default behavior remain available.
+
+~~~dotenv
+SITE_TITLE="My Markdown Site"
+FOOTER_TEXT="Published from Markdown"
+CONTENT_DIRECTORY="content"
+PUBLIC_DIRECTORY="public"
+~~~
+
+The root `.env` is loaded by the build, local launcher, Vite preview, and GitHub Pages build. The four-key priority above does not apply to protected pipeline values. `VITE_BASE_PATH`, repository name, GitHub identity, Host/Port, environment-file selectors, and runtime-test controls cannot be overridden by `.env`; adding those keys to the file has no effect. They retain their existing process, GitHub Actions, Git, command-line, and default sources.
+
+Use `ENV_FILE` to select a specific dotenv file or `ENV_DIRECTORY` to select a directory containing `.env`; supply these selectors from the shell or CI, not from `.env` itself:
+
+~~~bash
+ENV_FILE="config/example.env" npm run build
+ENV_DIRECTORY="config" npm run build
+~~~
+
+For the runtime smoke test, `RT_TEST_ENV_FILE` and `RT_TEST_ENV_DIRECTORY` select the environment file or directory used by the disposable compilation. If neither is supplied, the test selects `dev/rt-test/fixtures/env/empty.env`, so a user's root `.env` cannot redirect the disposable fixture build. Test-only settings remain script/CI inputs, not user `.env` settings.
+
+The repository's configuration fixture can be exercised dynamically with explicit expected values:
+
+~~~bash
+RT_TEST_ENV_FILE="dev/rt-test/fixtures/env/override.env" \
+RT_TEST_EXPECTED_SITE_TITLE="Dotenv fixture site" \
+RT_TEST_EXPECTED_FOOTER_TEXT="Dotenv fixture footer" \
+npm run rt-test
 ~~~
 
 An empty `FOOTER_TEXT` uses the fixed template attribution. Set it to `null` or `nil` to remove the footer component and its top border entirely.
@@ -130,7 +159,7 @@ For a repository-scoped host such as GitHub Pages, set the base path to the repo
 VITE_BASE_PATH="/repository-name/" npm run build
 ~~~
 
-The same value can be passed as `npm run build -- --base /repository-name/`; the command-line value takes precedence. The GitHub Pages workflow supplies the repository name automatically, along with `GITHUB_USERNAME` and `GITHUB_USER_FULL_NAME`, so a cloned repository does not need hardcoded identity values.
+The same value can be passed as `npm run build -- --base /repository-name/`; the command-line value takes precedence. For GitHub Pages, leave this unset: the workflow supplies the repository name automatically, along with `GITHUB_USERNAME` and `GITHUB_USER_FULL_NAME`, so the current repository remains the source of truth for deployment identity and base paths.
 
 The build input roots are configurable as well. This is useful for a separate site, a preview, or an isolated test fixture:
 
@@ -166,7 +195,7 @@ The output is in dist/. It can be deployed to any static host.
 
 ## Deploy to GitHub Pages
 
-Pushes to `main` run `.github/workflows/deploy.yml`. The workflow runs `npm test` and `npm run rt-test` before building, uses the current repository name as the base path, and publishes `dist/` to the `deploy` branch with a `.nojekyll` marker. If either test fails, the build and deployment steps do not run.
+Pushes to `main` run `.github/workflows/deploy.yml`. The workflow runs the unused-code check, `npm test`, and `npm run rt-test` before compiling the current Markdown with `npm run build`. It uses the current repository name as the base path and publishes `dist/` to the `deploy` branch with a `.nojekyll` marker. If a check fails, deployment does not run.
 
 Start the local Vite preview after compiling:
 

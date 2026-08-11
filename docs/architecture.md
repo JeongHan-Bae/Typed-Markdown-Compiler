@@ -117,6 +117,8 @@ type IrNode =
 
 ## Build and output ownership
 
+Before build orchestration, `constants/environment.ts` reads the selected dotenv file with the `dotenv` library. Only `SITE_TITLE`, `FOOTER_TEXT`, `CONTENT_DIRECTORY`, and `PUBLIC_DIRECTORY` are accepted from that file. A non-empty accepted value replaces the same process value; an empty accepted value leaves normal process/default resolution unchanged. All other keys are ignored at this boundary, so deployment identity, repository/base-path, server, selector, and test controls retain their existing sources.
+
 `src/build.ts` owns the final build orchestration:
 
 1. remove and recreate `dist/`;
@@ -143,15 +145,18 @@ The following is the architecture-focused view of `jh_cp tree . --git-view`; the
 │   └── workflows/
 │       └── deploy.yml
 ├── constants/
+│   ├── environment.ts
 │   ├── github.ts
 │   ├── runtime.ts
 │   └── site.ts
 ├── content/                  Checked-in example authoring input.
 ├── dev/
+│   ├── rt-test/
+│   │   └── fixtures/        Disposable dynamic-test content and assets.
 │   ├── compiler.sh
+│   ├── export-env.ts
 │   ├── launcher.sh
-│   ├── rt-test.sh            Dynamic build/HTTP smoke-test entrypoint.
-│   └── rt-test/fixtures/     Disposable dynamic-test content and assets.
+│   └── rt-test.sh            Dynamic build/HTTP smoke-test entrypoint.
 ├── docs/                     Architecture, authoring, and syntax contracts.
 ├── public/                   Browser-renderable source assets.
 ├── src/
@@ -187,6 +192,7 @@ The following is the architecture-focused view of `jh_cp tree . --git-view`; the
 │   ├── site.less
 │   └── theme.less
 ├── test/                     Static compiler/build tests and feature data.
+├── .env                      Four user-facing optional build values.
 ├── .gitattributes
 ├── .gitignore
 ├── AGENTS.md

@@ -15,5 +15,5 @@
     "forceConsistentCasingInFileNames": true,
     "types": ["node"]
   },
-  "include": ["const.ts", "constants/**/*.ts", "config.ts", "vite.config.ts", "src/**/*.ts", "test/**/*.ts"]
+  "include": ["const.ts", "constants/**/*.ts", "config.ts", "dev/**/*.ts", "vite.config.ts", "src/**/*.ts", "test/**/*.ts"]
 }

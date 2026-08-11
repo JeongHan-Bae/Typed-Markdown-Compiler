@@ -2,11 +2,12 @@ import { existsSync } from "node:fs";
 import { extname, join, resolve } from "node:path";
 import { defineConfig } from "vite";
 import type { Plugin, PreviewServer, ViteDevServer } from "vite";
+import { resolveEnvironment } from "./constants/environment.ts";
 import { DEFAULT_DEV_HOST, DEFAULT_DEV_PORT } from "./constants/runtime.ts";
 import { resolveConstants } from "./constants/site.ts";
 
 const port = Number(process.env.PORT ?? DEFAULT_DEV_PORT);
-const configuredBasePath = resolveConstants(process.env).basePath;
+const configuredBasePath = resolveConstants(resolveEnvironment(process.env)).basePath;
 const viteBasePath = configuredBasePath.length === 0 ? "/" : `${configuredBasePath}/`;
 
 const directoryIndexFallback: Plugin = {

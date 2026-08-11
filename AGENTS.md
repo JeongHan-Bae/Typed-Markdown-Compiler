@@ -45,6 +45,8 @@ Rules:
 ### Build Inputs And Outputs
 
 - Treat `CONTENT_DIRECTORY` and `PUBLIC_DIRECTORY` as build input overrides.
+- The root `.env` may override only `SITE_TITLE`, `FOOTER_TEXT`, `CONTENT_DIRECTORY`, and `PUBLIC_DIRECTORY` when their file values are non-empty. Empty allowed values leave process/default resolution unchanged.
+- Do not load deployment identity, repository/base-path, server, environment-selector, or test-control values from `.env`; those values retain their existing process, GitHub Actions, Git, command-line, and default sources.
 - Runtime tests must use disposable fixtures rather than the user-editable example `content/` and `public/` directories.
 - `npm run build` writes the complete deployable site to `dist/`; never edit `dist/` by hand.
 - The browser receives static HTML and CSS only. Do not ship a Vue runtime, client-side Markdown parser, client-side renderer, or backend dependency.
@@ -65,6 +67,7 @@ Primary structure:
 
 ```text
 constants/
+  environment.ts            Dotenv parsing and the four-key user allowlist.
   github.ts                 GitHub SVG constants.
   runtime.ts                Runtime, AST, route, and image limits.
   site.ts                   Typed site defaults and environment resolution.

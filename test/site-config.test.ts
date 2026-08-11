@@ -1,6 +1,14 @@
 import assert from "node:assert/strict";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import test from "node:test";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { renderToString } from "@vue/server-renderer";
+import {
+  parseEnvironmentFile,
+  resolveEnvironment,
+  resolveEnvironmentFilePath
+} from "../constants/environment.ts";
 import { constantDefinitions, resolveConstants } from "../constants/site.ts";
 import {
   renderGithubAvatar,
@@ -9,6 +17,99 @@ import {
 import { resolveCurrentGithubUsername } from "./git-identity.ts";
 
 const currentGithubUsername = resolveCurrentGithubUsername();
+
+test("loads dotenv values over process fallbacks and ignores empty values", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "typed-markdown-env-"));
+  const environmentFile = join(directory, "custom.env");
+  await writeFile(
+    environmentFile,
+    [
+      "SITE_TITLE=Dotenv title",
+      "FOOTER_TEXT=",
+      "CONTENT_DIRECTORY=dotenv-content",
+      "PUBLIC_DIRECTORY='dotenv-public'",
+      "VITE_BASE_PATH=dotenv-site # inline comment",
+      "GITHUB_USERNAME=dotenv-user",
+      "GITHUB_ACTOR=dotenv-actor",
+      "GITHUB_REPOSITORY_NAME=dotenv-repository",
+      "HOST=dotenv-host",
+      "PORT=9999",
+      "ENV_DIRECTORY=dotenv-selector",
+      "RT_TEST_HOST=dotenv-test-host",
+      "# comments and blank lines are supported",
+      ""
+    ].join("\n"),
+    "utf8"
+  );
+
+  try {
+    const environment = resolveEnvironment({
+      ENV_FILE: environmentFile,
+      SITE_TITLE: "Process title",
+      FOOTER_TEXT: "Process footer",
+      CONTENT_DIRECTORY: "process-content",
+      PUBLIC_DIRECTORY: "process-public",
+      VITE_BASE_PATH: "process-site",
+      GITHUB_USERNAME: "process-user",
+      GITHUB_ACTOR: "process-actor",
+      GITHUB_REPOSITORY_NAME: "process-repository",
+      HOST: "process-host",
+      PORT: "4173",
+      ENV_DIRECTORY: "process-selector",
+      RT_TEST_HOST: "process-test-host"
+    }, directory);
+
+    assert.equal(environment.SITE_TITLE, "Dotenv title");
+    assert.equal(environment.FOOTER_TEXT, "Process footer");
+    assert.equal(environment.CONTENT_DIRECTORY, "dotenv-content");
+    assert.equal(environment.PUBLIC_DIRECTORY, "dotenv-public");
+    assert.equal(environment.VITE_BASE_PATH, "process-site");
+    assert.equal(environment.GITHUB_USERNAME, "process-user");
+    assert.equal(environment.GITHUB_ACTOR, "process-actor");
+    assert.equal(environment.GITHUB_REPOSITORY_NAME, "process-repository");
+    assert.equal(environment.HOST, "process-host");
+    assert.equal(environment.PORT, "4173");
+    assert.equal(environment.ENV_DIRECTORY, "process-selector");
+    assert.equal(environment.RT_TEST_HOST, "process-test-host");
+    assert.equal(resolveConstants(environment).basePath, "/process-site");
+    assert.deepEqual(parseEnvironmentFile("SITE_TITLE=Example\nEMPTY=\n"), {
+      SITE_TITLE: "Example",
+      EMPTY: ""
+    });
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("supports the project root and a selected dotenv directory", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "typed-markdown-env-root-"));
+  const selectedDirectory = join(directory, "configuration");
+  await mkdir(selectedDirectory);
+  await writeFile(join(directory, ".env"), "SITE_TITLE=Root dotenv title\n", "utf8");
+  await writeFile(
+    join(selectedDirectory, ".env"),
+    "SITE_TITLE=Directory dotenv title\n",
+    "utf8"
+  );
+
+  try {
+    assert.equal(resolveEnvironment({}, directory).SITE_TITLE, "Root dotenv title");
+    assert.equal(
+      resolveEnvironment({ ENV_DIRECTORY: "configuration" }, directory).SITE_TITLE,
+      "Directory dotenv title"
+    );
+    assert.equal(
+      resolveEnvironmentFilePath({ ENV_DIRECTORY: "configuration" }, directory),
+      join(selectedDirectory, ".env")
+    );
+    assert.throws(
+      () => resolveEnvironment({ ENV_FILE: "missing.env" }, directory),
+      /Environment file does not exist: .*missing\.env/u
+    );
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
 
 test("uses defaults and environment overrides for build constants", () => {
   const defaults = resolveConstants({});
