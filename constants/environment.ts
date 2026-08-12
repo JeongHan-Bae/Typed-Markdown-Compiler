@@ -4,13 +4,15 @@ import { parse } from "dotenv";
 
 export const ENV_FILE_NAME = "ENV_FILE";
 export const ENV_DIRECTORY_NAME = "ENV_DIRECTORY";
+export const ASSET_DIRECTORY_ENV_NAME = "ASSET_DIRECTORY";
 export const DEFAULT_ENV_FILE_NAME = ".env";
 
 const ENVIRONMENT_OVERRIDE_NAMES = new Set([
   "SITE_TITLE",
   "FOOTER_TEXT",
   "CONTENT_DIRECTORY",
-  "PUBLIC_DIRECTORY"
+  "PUBLIC_DIRECTORY",
+  ASSET_DIRECTORY_ENV_NAME
 ]);
 
 export type Environment = Readonly<Record<string, string | undefined>>;

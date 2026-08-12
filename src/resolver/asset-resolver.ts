@@ -1,6 +1,6 @@
 import { extname } from "node:path";
 import {
-  ASSET_DIRECTORY,
+  ASSET_OUTPUT_DIRECTORY,
   WEB_IMAGE_EXTENSIONS
 } from "../../constants/runtime.ts";
 
@@ -24,5 +24,5 @@ export function normalizeAssetName(name: string): string {
 }
 
 export function assetOutputPath(name: string): string {
-  return `${ASSET_DIRECTORY}/${normalizeAssetName(name)}`;
+  return `${ASSET_OUTPUT_DIRECTORY}/${normalizeAssetName(name)}`;
 }

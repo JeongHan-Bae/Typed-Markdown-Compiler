@@ -1,6 +1,6 @@
 # Markdown Syntax
 
-`typed-markdown-compiler` is a TypeScript Markdown-to-static-HTML compiler. This repository is also a reusable template repository: its checked-in `content/` and `public/assets/` are the default example inputs. The build pipeline parses and normalizes Markdown during the Node build, then emits static HTML, CSS, and assets under `dist/`; the deployed site does not contain the compiler, Vue runtime, Markdown parser, or a server-side runtime.
+`typed-markdown-compiler` is a TypeScript Markdown-to-static-HTML compiler. This repository is also a reusable template repository: its checked-in `content/` and `public/` are the default example inputs, with browser assets under `public/assets/`. The build pipeline parses and normalizes Markdown during the Node build, then emits static HTML and CSS plus copied public files and assets under `dist/`; the deployed site does not contain the compiler, Vue runtime, Markdown parser, or a server-side runtime.
 
 The example is intentionally shaped like a personal blog, with a home page, an about page, a field-notes collection, and posts. That is an example site and a recommended use case, not the identity of the project. The project is the compiler and can render other Markdown sites.
 
@@ -26,9 +26,10 @@ This compiler accepts Markdown with YAML frontmatter and a small set of typed ex
 For the built-in example, edit these locations:
 
 - `content/`: Markdown documents. File paths become logical routes and published HTML pages.
-- `public/assets/`: browser-renderable assets. An `asset:...` reference is copied to `dist/assets/` and emitted as a root-relative URL.
+- `public/`: public-file root. Files such as `public/feed.xml` are copied to the same path under `dist/` and linked with root-relative URLs.
+- `public/assets/`: default browser-renderable asset directory. An `asset:...` reference is copied to `dist/assets/` and emitted as a root-relative URL. `ASSET_DIRECTORY` may select another child of `PUBLIC_DIRECTORY`.
 
-The build's `CONTENT_DIRECTORY` and `PUBLIC_DIRECTORY` environment variables can point to other input roots for a customized site or disposable fixture. The default template still uses `content/` and `public/` as the build roots, with its authored browser assets in `public/assets/`.
+The build's `CONTENT_DIRECTORY` and `PUBLIC_DIRECTORY` environment variables can point to other input roots for a customized site or disposable fixture. `ASSET_DIRECTORY` independently selects the browser-asset source, defaulting to `PUBLIC_DIRECTORY/assets`; it must remain a child of `PUBLIC_DIRECTORY`. `PUBLIC_DIRECTORY` must stay the public-file root, not the asset directory. The configured asset directory is excluded from ordinary public-file copying and copied separately to `dist/assets/`. The default template uses `content/` and `public/` as the build roots, with its authored browser assets in `public/assets/`.
 
 ## Frontmatter
 
@@ -87,7 +88,7 @@ Use `route:` targets for internal links. The route name uses colons instead of s
 
 `route:index`, `route:home`, and an empty route target resolve to the root page.
 
-External links keep their normal Markdown targets. HTTPS links and mail links are emitted unchanged:
+External links keep their normal Markdown targets. HTTP(S), mail, telephone, and FTP links are emitted unchanged:
 
 ~~~markdown
 [GitHub](https://github.com/example)
@@ -95,7 +96,9 @@ External links keep their normal Markdown targets. HTTPS links and mail links ar
 [RSS](/feed.xml)
 ~~~
 
-Use a root-relative target such as `/feed.xml` for an RSS endpoint supplied by the static host. When a repository base path is configured, root-relative generated links receive that base prefix; HTTPS and `mailto:` links remain external links.
+For a checked-in RSS file, place it at `public/feed.xml`; the build copies it to `dist/feed.xml`, and a root-relative target such as `/feed.xml` points to it. Do not place the source file at the repository root. When a repository base path is configured, root-relative generated links receive that base prefix; HTTPS and `mailto:` links remain external links.
+
+The compiler rejects any URL with a scheme outside `http`, `https`, `mailto`, `tel`, and `ftp`. Scheme checks are case-insensitive and normalize percent-encoded bytes and whitespace/control characters before validation, so variants such as `JaVaScRiPt:`, `java%73cript:`, `java%09script:`, `data:`, `vbscript:`, and an unknown scheme such as `custom:` fail compilation rather than being emitted as relative links. The `route:` and `asset:` authoring targets are resolved to validated site paths before this check.
 
 ## Collections
 
@@ -113,7 +116,7 @@ source: blogs/
 Posts published in this directory appear below this page.
 ~~~
 
-Every published Markdown file below `blogs/` other than directory index heads becomes an item. A list item may also declare its own `type: list` and `source`, so the same document can be a list object and the head of a nested list. The compiler infers the page structure from the path and these declarations.
+The compiler recursively discovers every published Markdown file below the content root, independently of collection declarations, so deeper files still receive routes. Collection mounting uses the direct parent directory: a head with `source: blogs/` lists published documents directly inside `blogs/`, excluding directory index heads, but it does not flatten documents from `blogs/series/` into that list. The exact nested directory can become its own collection through `blogs/series/index.md` or through an external page that declares `type: list` and `source: blogs/series/`. A direct item may itself be a list head, producing a list object with its own nested list.
 
 An external list head may use the same user-facing root name as its source directory (`blogs.md` with `source: blogs/`) or a different name (`blog.md` with `source: blogs/`).
 
@@ -156,7 +159,9 @@ Put browser-renderable assets under `public/assets/` and address them relative t
 ![Marker](asset:icons/marker.svg)
 ~~~
 
-Supported image extensions are AVIF, GIF, JPEG, JPG, PNG, SVG, and WebP. Traversal paths and unsupported file types fail during compilation. The compiler copies assets into `dist/assets/` and emits root-relative URLs.
+Supported image extensions are AVIF, GIF, JPEG, JPG, PNG, SVG, and WebP. An `asset:` name is relative to `ASSET_DIRECTORY`, which defaults to `PUBLIC_DIRECTORY/assets`, not to `PUBLIC_DIRECTORY` itself. Traversal paths, absolute names, and unsupported file types fail during compilation. The compiler copies valid image assets into `dist/assets/` and emits root-relative URLs.
+
+Other public files use their public-root URL directly: `PUBLIC_DIRECTORY/feed.xml` becomes `/feed.xml` after the build. `asset:feed.xml` is invalid because XML is not an image asset. `asset:/feed.xml` and `asset:public/feed.xml` are also invalid forms for the public-root file; an `asset:` target never addresses files from the public root or repository root. Absolute names, traversal names, and unsupported file types are rejected as well.
 
 Images may also use an external URL. The URL is kept as the rendered `src` and the browser attempts to load it:
 
@@ -164,7 +169,7 @@ Images may also use an external URL. The URL is kept as the rendered `src` and t
 ![Remote marker](https://example.com/marker.svg)
 ~~~
 
-Unsafe URL schemes cause compilation to fail and are never emitted.
+Unsafe or unrecognized URL schemes cause compilation to fail and are never emitted.
 
 An image can declare either a maximum width or a forced width immediately after the image:
 
@@ -180,7 +185,7 @@ The equivalent whitelisted HTML image form uses a numeric `width` or `max-width`
 <img src="asset:icons/marker.svg" alt="Forced marker" width="25vw">
 ~~~
 
-For this whitelist, HTML image sizing accepts numeric `%` or `vw` values; a Markdown `{max-width=30%}` and HTML `max-width: 30vw` normalize to the same semantic size, as do `{width=25%}` and HTML `width: 25vw`. Values such as `25px` or `25vh` are rejected rather than interpreted as image sizing.
+For this whitelist, HTML image sizing accepts numeric `%` or `vw` values; a Markdown `{max-width=30%}` and HTML `max-width: 30vw` normalize to the same semantic size, as do `{width=25%}` and HTML `width: 25vw`. An HTML image with a sizing unit such as `25px` or `25vh`, or with more than one sizing declaration, falls outside the whitelist and is escaped as source text rather than interpreted as an image.
 
 Use at most one sizing declaration on an image. Without a declaration, the actual width is the smaller of the image's intrinsic width and the default `CONTENT_IMAGE_MAX_WIDTH_PERCENT` cap of 40% of the content column. The 40% value is only a maximum, so a smaller image stays at its intrinsic size.
 
@@ -322,4 +327,4 @@ Unsupported HTML is rendered as text rather than interpreted:
 <iframe src="https://example.com">frame</iframe>
 ~~~
 
-The generated content contains escaped text such as `&lt;script&gt;...` and no executable HTML element. Unsafe `javascript:` and similar URL schemes fail compilation. Asset traversal, unsupported asset extensions, image widths outside `0%`–`100%`, duplicate image sizing declarations, and unsupported image sizing units such as `25px` or `25vh` also fail compilation. A non-root directory index cannot declare `type: page` or an explicit `source`.
+The generated content contains escaped text such as `&lt;script&gt;...` and no executable HTML element. Unsupported HTML structure, duplicate HTML image sizing declarations, and HTML image sizing units such as `25px` or `25vh` are likewise escaped as source text. Unsafe or unrecognized URL schemes—including case, percent-encoded, and whitespace/control-character variants of `javascript:`, `data:`, and `vbscript:`—fail compilation. Asset traversal, unsupported asset extensions, Markdown image widths outside `0%`–`100%`, malformed YAML frontmatter, a list page without a source, and forbidden directory-index metadata also fail compilation.

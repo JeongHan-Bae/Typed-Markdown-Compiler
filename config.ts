@@ -13,5 +13,6 @@ export const siteConfig: SiteConfig = {
   contentDirectory: constants.contentDirectory,
   styleEntry: "styles/site.less",
   publicDirectory: constants.publicDirectory,
+  assetDirectory: constants.assetDirectory,
   basePath: constants.basePath
 };

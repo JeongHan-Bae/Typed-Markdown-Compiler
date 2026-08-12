@@ -4,6 +4,7 @@ set -Eeuo pipefail
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 TEST_CONTENT_DIRECTORY="${RT_TEST_CONTENT_DIRECTORY:-dev/rt-test/fixtures/content}"
 TEST_PUBLIC_DIRECTORY="${RT_TEST_PUBLIC_DIRECTORY:-dev/rt-test/fixtures/public}"
+TEST_ASSET_DIRECTORY="${RT_TEST_ASSET_DIRECTORY:-${TEST_PUBLIC_DIRECTORY}/assets}"
 STARTUP_ATTEMPTS=60
 STARTUP_DELAY_SECONDS="0.1"
 LOG_FILE="$(mktemp "${TMPDIR:-/tmp}/typed-markdown-rt-test.XXXXXX.log")"
@@ -166,6 +167,7 @@ fi
 
 CONTENT_DIRECTORY="$TEST_CONTENT_DIRECTORY" \
 PUBLIC_DIRECTORY="$TEST_PUBLIC_DIRECTORY" \
+ASSET_DIRECTORY="$TEST_ASSET_DIRECTORY" \
 VITE_BASE_PATH="" \
   "$ROOT_DIR/dev/compiler.sh"
 
@@ -217,5 +219,13 @@ asset_body="$(curl --fail --silent --show-error "$BASE_URL/assets/icons/runtime-
   || fail "SVG asset did not return a successful response"
 [[ "$asset_body" == *"<svg"* ]] || fail "SVG asset response is not SVG content"
 printf 'OK %s/assets/icons/runtime-marker.svg\n' "$BASE_URL"
+
+feed_body="$(curl --fail --silent --show-error "$BASE_URL/feed.xml")" \
+  || fail "public/feed.xml did not return a successful response"
+[[ "$feed_body" == *'<rss version="2.0">'* ]] \
+  || fail "public/feed.xml response is not the configured XML fixture"
+[[ "$feed_body" == *'<title>Runtime fixture feed</title>'* ]] \
+  || fail "public/feed.xml response has unexpected content"
+printf 'OK %s/feed.xml\n' "$BASE_URL"
 
 printf 'Runtime test passed; server will be stopped automatically.\n'

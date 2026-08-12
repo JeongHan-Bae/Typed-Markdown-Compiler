@@ -20,6 +20,7 @@ export interface SiteConfig {
   contentDirectory: string;
   styleEntry: string;
   publicDirectory: string;
+  assetDirectory: string;
 }
 
 export interface PageMetadata {

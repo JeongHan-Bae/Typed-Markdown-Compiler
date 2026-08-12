@@ -1,3 +1,6 @@
+import { join } from "node:path";
+import { ASSET_DIRECTORY_NAME } from "./runtime.ts";
+
 export interface ConstantDefinition {
   environmentName: string;
   defaultValue: string;
@@ -24,6 +27,10 @@ export const constantDefinitions = {
     environmentName: "PUBLIC_DIRECTORY",
     defaultValue: "public"
   },
+  assetDirectory: {
+    environmentName: "ASSET_DIRECTORY",
+    defaultValue: "public/assets"
+  },
   basePath: {
     environmentName: "VITE_BASE_PATH",
     defaultValue: ""
@@ -36,6 +43,7 @@ export interface ResolvedConstants {
   footerText: string | null;
   contentDirectory: string;
   publicDirectory: string;
+  assetDirectory: string;
   basePath: string;
 }
 
@@ -45,14 +53,27 @@ export function resolveConstants(
 ): ResolvedConstants {
   const githubUsername = resolveGithubUsername(environment);
   const githubFullName = resolveGithubFullName(environment, githubUsername);
+  const contentDirectory = resolveValue(constantDefinitions.contentDirectory, environment);
+  const publicDirectory = resolveValue(constantDefinitions.publicDirectory, environment);
   return {
     siteTitle: resolveSiteTitle(environment, githubFullName),
     githubUsername,
     footerText: resolveFooterValue(environment),
-    contentDirectory: resolveValue(constantDefinitions.contentDirectory, environment),
-    publicDirectory: resolveValue(constantDefinitions.publicDirectory, environment),
+    contentDirectory,
+    publicDirectory,
+    assetDirectory: resolveAssetDirectory(environment, publicDirectory),
     basePath: resolveBasePath(environment, cliArguments)
   };
+}
+
+function resolveAssetDirectory(
+  environment: Readonly<Record<string, string | undefined>>,
+  publicDirectory: string
+): string {
+  const configured = environment[constantDefinitions.assetDirectory.environmentName]?.trim();
+  return configured === undefined || configured.length === 0
+    ? join(publicDirectory, ASSET_DIRECTORY_NAME)
+    : configured;
 }
 
 function resolveValue(

@@ -28,6 +28,7 @@ test("loads dotenv values over process fallbacks and ignores empty values", asyn
       "FOOTER_TEXT=",
       "CONTENT_DIRECTORY=dotenv-content",
       "PUBLIC_DIRECTORY='dotenv-public'",
+      "ASSET_DIRECTORY='dotenv-public/browser-assets'",
       "VITE_BASE_PATH=dotenv-site # inline comment",
       "GITHUB_USERNAME=dotenv-user",
       "GITHUB_ACTOR=dotenv-actor",
@@ -49,6 +50,7 @@ test("loads dotenv values over process fallbacks and ignores empty values", asyn
       FOOTER_TEXT: "Process footer",
       CONTENT_DIRECTORY: "process-content",
       PUBLIC_DIRECTORY: "process-public",
+      ASSET_DIRECTORY: "process-public/process-assets",
       VITE_BASE_PATH: "process-site",
       GITHUB_USERNAME: "process-user",
       GITHUB_ACTOR: "process-actor",
@@ -63,6 +65,7 @@ test("loads dotenv values over process fallbacks and ignores empty values", asyn
     assert.equal(environment.FOOTER_TEXT, "Process footer");
     assert.equal(environment.CONTENT_DIRECTORY, "dotenv-content");
     assert.equal(environment.PUBLIC_DIRECTORY, "dotenv-public");
+    assert.equal(environment.ASSET_DIRECTORY, "dotenv-public/browser-assets");
     assert.equal(environment.VITE_BASE_PATH, "process-site");
     assert.equal(environment.GITHUB_USERNAME, "process-user");
     assert.equal(environment.GITHUB_ACTOR, "process-actor");
@@ -124,6 +127,11 @@ test("uses defaults and environment overrides for build constants", () => {
   assert.equal(resolveConstants({ FOOTER_TEXT: "nil" }).footerText, null);
   assert.equal(defaults.contentDirectory, "content");
   assert.equal(defaults.publicDirectory, "public");
+  assert.equal(defaults.assetDirectory, "public/assets");
+  assert.equal(
+    resolveConstants({ PUBLIC_DIRECTORY: "site-public" }).assetDirectory,
+    "site-public/assets"
+  );
   assert.equal(defaults.basePath, "");
 
   const inferredFromActions = resolveConstants({
@@ -154,13 +162,15 @@ test("uses defaults and environment overrides for build constants", () => {
     GITHUB_USERNAME: currentGithubUsername ?? "",
     FOOTER_TEXT: "A personal publication",
     CONTENT_DIRECTORY: "dev/rt-test/fixtures/content",
-    PUBLIC_DIRECTORY: "dev/rt-test/fixtures/public"
+    PUBLIC_DIRECTORY: "dev/rt-test/fixtures/public",
+    ASSET_DIRECTORY: "dev/rt-test/fixtures/public/browser-assets"
   });
   assert.equal(overridden.siteTitle, "Personal Blog");
   assert.equal(overridden.githubUsername, currentGithubUsername ?? "");
   assert.equal(overridden.footerText, "A personal publication");
   assert.equal(overridden.contentDirectory, "dev/rt-test/fixtures/content");
   assert.equal(overridden.publicDirectory, "dev/rt-test/fixtures/public");
+  assert.equal(overridden.assetDirectory, "dev/rt-test/fixtures/public/browser-assets");
 });
 
 test("only renders the GitHub action for a valid username", async (t) => {

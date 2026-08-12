@@ -46,7 +46,7 @@ fi
 "$ROOT_DIR/dev/compiler.sh"
 
 # The compiler and Vite config load the root .env (or ENV_FILE/ENV_DIRECTORY).
-# Export only the four allowed non-empty user values for launcher-side setup.
+# Export only the five allowed non-empty user values for launcher-side setup.
 # Protected deployment, identity, server, and test controls are never exported.
 eval "$(node --import=tsx "$ROOT_DIR/dev/export-env.ts")"
 export HOST="${HOST:-127.0.0.1}"

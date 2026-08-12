@@ -1,7 +1,8 @@
-import { cp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { cp, lstat, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import less from "less";
 import { siteConfig } from "../config.ts";
+import { ASSET_OUTPUT_DIRECTORY } from "../constants/runtime.ts";
 import type { CollectionResult, RenderPageInput, RouteRecord, SourceDocument } from "./ast/types.ts";
 import { normalizeGithubUsername } from "./plugins/github-follow-link.ts";
 import { assetOutputPath, normalizeAssetName } from "./resolver/asset-resolver.ts";
@@ -23,9 +24,11 @@ async function build(): Promise<void> {
   const manifest = await discoverContent(rootDirectory, siteConfig);
   const resolver = new RouteResolver(manifest.routes, siteConfig.basePath);
   const collectionMap = manifest.collections;
+  const publicPaths = resolvePublicPaths();
 
   await compileStyles();
-  await copyPublicAssets();
+  await copyPublicFiles(publicPaths);
+  await copyConfiguredAssets(publicPaths);
   const githubAvatarHref = await prepareGithubAvatar(siteConfig.githubUsername);
 
   for (const route of resolver.all()) {
@@ -155,18 +158,94 @@ async function compileStyles(): Promise<void> {
   await writeFile(outputPath, result.css, "utf8");
 }
 
-async function copyPublicAssets(): Promise<void> {
-  const publicDirectory = join(rootDirectory, siteConfig.publicDirectory);
-  const entries = await readdir(publicDirectory, { withFileTypes: true });
+interface PublicPaths {
+  publicDirectory: string;
+  assetDirectory: string;
+  defaultAssetDirectory: string;
+}
+
+function resolvePublicPaths(): PublicPaths {
+  const publicDirectory = resolve(rootDirectory, siteConfig.publicDirectory);
+  const assetDirectory = resolve(rootDirectory, siteConfig.assetDirectory);
+  const defaultAssetDirectory = resolve(publicDirectory, ASSET_OUTPUT_DIRECTORY);
+  const relativeAssetDirectory = relative(publicDirectory, assetDirectory);
+  if (
+    relativeAssetDirectory.length === 0
+    || relativeAssetDirectory === ".."
+    || relativeAssetDirectory.startsWith(`..${sep}`)
+    || isAbsolute(relativeAssetDirectory)
+  ) {
+    throw new Error(
+      `ASSET_DIRECTORY must be a child of PUBLIC_DIRECTORY: ${siteConfig.assetDirectory}`
+    );
+  }
+  return { publicDirectory, assetDirectory, defaultAssetDirectory };
+}
+
+async function copyPublicFiles(paths: PublicPaths): Promise<void> {
+  const entries = await readdir(paths.publicDirectory, { withFileTypes: true });
+  const excludedDirectories = [paths.defaultAssetDirectory, paths.assetDirectory];
   for (const entry of entries) {
     if (entry.name === ".gitkeep") {
       continue;
     }
-    await cp(join(publicDirectory, entry.name), join(distDirectory, entry.name), {
-      recursive: true,
-      force: true
-    });
+    await copyPublicEntry(
+      join(paths.publicDirectory, entry.name),
+      join(distDirectory, entry.name),
+      excludedDirectories
+    );
   }
+}
+
+async function copyPublicEntry(
+  sourcePath: string,
+  outputPath: string,
+  excludedDirectories: readonly string[]
+): Promise<void> {
+  if (excludedDirectories.includes(resolve(sourcePath))) {
+    return;
+  }
+
+  const entry = await lstat(sourcePath);
+  if (!entry.isDirectory()) {
+    await cp(sourcePath, outputPath, { force: true });
+    return;
+  }
+
+  await mkdir(outputPath, { recursive: true });
+  const children = await readdir(sourcePath, { withFileTypes: true });
+  for (const child of children) {
+    await copyPublicEntry(
+      join(sourcePath, child.name),
+      join(outputPath, child.name),
+      excludedDirectories
+    );
+  }
+}
+
+async function copyConfiguredAssets(paths: PublicPaths): Promise<void> {
+  let entry;
+  try {
+    entry = await lstat(paths.assetDirectory);
+  } catch (error: unknown) {
+    if (isMissingPathError(error)) {
+      return;
+    }
+    throw error;
+  }
+  if (!entry.isDirectory()) {
+    throw new Error(`Configured asset directory is not a directory: ${siteConfig.assetDirectory}`);
+  }
+
+  await cp(
+    paths.assetDirectory,
+    join(distDirectory, ASSET_OUTPUT_DIRECTORY),
+    { recursive: true, force: true }
+  );
+}
+
+function isMissingPathError(error: unknown): boolean {
+  return error instanceof Error && "code" in error && error.code === "ENOENT";
 }
 
 async function writeRouteManifest(resolver: RouteResolver, collections: CollectionResult[]): Promise<void> {

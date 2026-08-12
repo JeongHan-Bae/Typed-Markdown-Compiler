@@ -303,10 +303,50 @@ function resolveImageSource(
 }
 
 function sanitizeHref(href: string): string {
-  if (/^(?:javascript|data|vbscript):/iu.test(href.trim())) {
+  const scheme = URL_SCHEME_PATTERN.exec(normalizeHrefForSchemeCheck(href))?.[1]?.toLowerCase();
+  if (scheme !== undefined && !SAFE_URL_SCHEMES.has(scheme)) {
     throw new Error(`Unsafe URL rejected by renderer: ${href}`);
   }
   return href;
+}
+
+const SAFE_URL_SCHEMES: ReadonlySet<string> = new Set([
+  "http",
+  "https",
+  "mailto",
+  "tel",
+  "ftp"
+]);
+
+const URL_SCHEME_PATTERN = /^([a-z][a-z0-9+.-]*):/iu;
+const PERCENT_ENCODED_BYTE_PATTERN = /%([0-9a-f]{2})/giu;
+const URL_SCHEME_DECODE_PASSES = 4;
+
+function normalizeHrefForSchemeCheck(href: string): string {
+  let normalized = href;
+  for (let pass = 0; pass < URL_SCHEME_DECODE_PASSES; pass += 1) {
+    const decoded = decodePercentEncodedBytes(normalized);
+    if (decoded === normalized) {
+      break;
+    }
+    normalized = decoded;
+  }
+
+  // Browsers discard leading C0 controls and treat ASCII whitespace/control
+  // characters inside a URL scheme as separators during URL processing. Remove
+  // them before checking so obfuscated schemes cannot fall through as relative
+  // links. This normalization is used only for validation; the original href
+  // is preserved when a URL is accepted.
+  return normalized.replace(/[\s\u0000-\u001f\u007f-\u009f]/gu, "");
+}
+
+function decodePercentEncodedBytes(value: string): string {
+  return value.replace(
+    PERCENT_ENCODED_BYTE_PATTERN,
+    (_match: string, encodedByte: string): string => String.fromCharCode(
+      Number.parseInt(encodedByte, 16)
+    )
+  );
 }
 
 function element(

@@ -28,7 +28,7 @@ Markdown and frontmatter
   -> JSON-like IR
   -> typed Vue VNodes
   -> Vue SSR during the Node build
-  -> static HTML, CSS, and copied assets
+  -> static HTML, CSS, copied public files, and browser assets
 ```
 
 Rules:
@@ -44,12 +44,12 @@ Rules:
 
 ### Build Inputs And Outputs
 
-- Treat `CONTENT_DIRECTORY` and `PUBLIC_DIRECTORY` as build input overrides.
-- The root `.env` may override only `SITE_TITLE`, `FOOTER_TEXT`, `CONTENT_DIRECTORY`, and `PUBLIC_DIRECTORY` when their file values are non-empty. Empty allowed values leave process/default resolution unchanged.
+- Treat `CONTENT_DIRECTORY`, `PUBLIC_DIRECTORY`, and `ASSET_DIRECTORY` as build input overrides. `ASSET_DIRECTORY` defaults to `PUBLIC_DIRECTORY/assets` and must remain a child of `PUBLIC_DIRECTORY`.
+- The root `.env` may override only `SITE_TITLE`, `FOOTER_TEXT`, `CONTENT_DIRECTORY`, `PUBLIC_DIRECTORY`, and `ASSET_DIRECTORY` when their file values are non-empty. Empty allowed values leave process/default resolution unchanged.
 - Do not load deployment identity, repository/base-path, server, environment-selector, or test-control values from `.env`; those values retain their existing process, GitHub Actions, Git, command-line, and default sources.
 - Runtime tests must use disposable fixtures rather than the user-editable example `content/` and `public/` directories.
 - `npm run build` writes the complete deployable site to `dist/`; never edit `dist/` by hand.
-- The browser receives static HTML and CSS only. Do not ship a Vue runtime, client-side Markdown parser, client-side renderer, or backend dependency.
+- The browser receives static HTML and CSS plus copied public files and assets. Do not ship a Vue runtime, client-side Markdown parser, client-side renderer, generated application JavaScript, or backend dependency.
 - `VITE_BASE_PATH` changes the generated root-relative route and asset prefix for repository-scoped hosts such as GitHub Pages.
 - The build also accepts `npm run build -- --base /repository-name/`; the command-line value takes precedence over `VITE_BASE_PATH`.
 - If no explicit base is supplied but `GITHUB_REPOSITORY_NAME` or the standard `GITHUB_REPOSITORY=owner/name` environment value exists, the repository name is used as the base path.
@@ -67,7 +67,7 @@ Primary structure:
 
 ```text
 constants/
-  environment.ts            Dotenv parsing and the four-key user allowlist.
+  environment.ts            Dotenv parsing and the five-key user allowlist.
   github.ts                 GitHub SVG constants.
   runtime.ts                Runtime, AST, route, and image limits.
   site.ts                   Typed site defaults and environment resolution.
@@ -75,8 +75,9 @@ content/                    Author-managed Markdown input.
 dev/
   compiler.sh               Type-check and static build entrypoint.
   launcher.sh               Local build and Vite preview entrypoint.
-  rt-test.sh                Isolated runtime smoke test.
-public/assets/              Browser-renderable source assets.
+  rt-test.sh                Isolated full runtime test.
+public/                     Public-file root.
+  assets/                   Default browser-renderable source assets; ASSET_DIRECTORY may select another child.
 docs/                       Architecture, authoring, and Markdown syntax documentation.
 src/
   ast/                      Normalized AST and public domain types.
@@ -112,6 +113,7 @@ CONTRIBUTING.md             Commit and pull request requirements.
 - The root `index` route also accepts the empty route name and `home` alias.
 - For an external list head, declare `type: list` and `source: <directory>/`; the file name may give the collection the same user-facing root name or a different one. A non-root directory `index.md` is instead an implicit list head for its containing directory and can only use that directory's name. The page structure is inferred from the path and list declarations. Frontmatter does not select a page template.
 - An external list page declared with `source: blogs/`—whether its file is `blogs.md` or `blog.md`—conflicts with `blogs/index.md` when that directory index is also present; one source directory has one canonical collection head. `indexed` ordering applies independently to root navigation and each direct collection-item level, while index heads are excluded from item lists.
+- Content discovery is recursive and independent from collection declarations. Collection membership is direct-parent based: a route is mounted only into the collection whose source equals its containing directory. A nested collection may be declared by that directory's `index.md` or by an external `type: list` page whose `source` names the directory; without either head, nested routes still exist but are not mounted in a list.
 
 ### Generated Site And GitHub Pages
 
@@ -152,7 +154,7 @@ The project turns author-managed Markdown into a complete static site:
 - Image-only paragraphs are centered by default. Images mixed with text remain left-aligned by default.
 - Preserve native authoring alignment with `<div align="left|center|right">` or equivalent `text-align` style wrappers. Supported wrappers become typed content-alignment AST/VNodes; other raw HTML remains escaped.
 - Image sizing declarations are typed Markdown extensions: `{max-width=30%}` changes the cap, while `{width=25%}` forces the rendered width. Whitelisted HTML images accept the corresponding numeric `vw` form (`max-width: 30vw` or `width: 25vw`) and normalize it to the same AST/IR semantics. Without a declaration, use the `CONTENT_IMAGE_MAX_WIDTH_PERCENT` default and intrinsic image size.
-- Treat `asset:...` links and images as validated web-image references into `public/assets/`. Preserve nested asset names, reject traversal and unsupported extensions, and emit root-relative `/assets/...` URLs.
+- Treat `asset:...` links and images as validated web-image references into `ASSET_DIRECTORY` (default `PUBLIC_DIRECTORY/assets`). Preserve nested asset names, reject traversal and unsupported extensions, and emit root-relative `/assets/...` URLs.
 - Ordinary external image URLs such as `https://...` are allowed and remain external `src` values; unsafe URL schemes remain rejected by the IR boundary.
 - HTML equivalents of supported Markdown constructs are a whitelist. Supported tags normalize to the same AST/IR semantics as Markdown; unsupported tags and image sizing units other than the supported HTML `%`/`vw` forms remain escaped text.
 - The HTML whitelist includes alignment `div`, `h1` through `h5`, block containers, `img`, `ruby`/`rt`, `br`, `a`, and inline aliases `strong`/`b`, `em`/`i`, `del`/`s`/`strike`, and `code`/`tt`; HTML comments are discarded.
@@ -170,7 +172,7 @@ The project turns author-managed Markdown into a complete static site:
 
 ### Asset And Image Behavior
 
-- Public assets are copied into `dist/assets/`; nested names and supported image extensions must be preserved.
+- Public-root files retain their relative paths under `dist/`; configured browser assets are copied into `dist/assets/`, preserving nested names and supported image extensions.
 - A standalone image is centered and receives vertical spacing so adjacent images do not touch.
 - A wrapper may force an image or text block left, center, or right without introducing a custom image-only alignment attribute.
 - The GitHub avatar frame has a fixed square size and transparent background; the downloaded image must fit inside the frame and must not change its dimensions.
@@ -194,7 +196,7 @@ The project turns author-managed Markdown into a complete static site:
 ### Vue Template Rules
 
 - Keep the four generic Vue page components in `src/renderer/vue/templates.ts`.
-- Keep Vue as a build-time SSR dependency; no client-side Vue runtime or application JavaScript may be emitted.
+- Keep Vue as a build-time SSR dependency; no client-side Vue runtime or application JavaScript may be generated.
 - Keep content rendering at the AST-to-IR-to-VNode boundaries. Do not inject raw Markdown or arbitrary raw HTML into templates.
 - Header navigation, breadcrumbs, GitHub action, avatar, and optional footer belong to the static page chrome.
 
@@ -211,9 +213,9 @@ The project turns author-managed Markdown into a complete static site:
 - Keep cross-stage syntax fixtures in `test/features/`; static compiler-stage tests consume them. Each feature should assert the token tree, normalized AST, JSON-like IR, Vue VNode projection, and SSR HTML expected for the same source; include each documented syntax object in isolation and in mixed/nested outer-and-inner Markdown/HTML combinations, plus negative features for rejected or escaped input. `test/features/indexed-routes.ts` also covers root indexes, directory indexes, indexed zero, mixed indexed/unindexed items, nested indexes, same-name and different-name external list heads, and the conflicting external-head layout. Dynamic site tests and disposable runtime fixtures belong under `dev/`; `dev/rt-test/fixtures/content/syntax.md` and `dev/rt-test.sh` must exercise the documented positive syntax in an actual generated page, while the draft fixture must prove excluded routes stay unavailable.
 - Treat `docs/syntax.md` as a tested contract. Whenever syntax is added or changed, update the matching `test/features/` source and expected data, then update or add the focused test that proves the behavior. A syntax description may remain in `docs/syntax.md` only when its feature data exists and the test passes.
 - A failing syntax test is evidence that the implementation or its expected semantic output is incomplete. Do not delete tests, remove coverage, weaken assertions, skip cases, or otherwise hide a failure to make the suite pass; fix the implementation or correct the expected data to match the intentional contract.
-- Test runtime behavior with disposable fixtures through `CONTENT_DIRECTORY` and `PUBLIC_DIRECTORY` overrides.
+- Test runtime behavior with disposable fixtures through `CONTENT_DIRECTORY`, `PUBLIC_DIRECTORY`, and `ASSET_DIRECTORY` overrides.
 - Keep test content and rendered-output assertions independent from clone-specific usernames, full names, avatars, and repository names.
-- Before handoff, run the type checker, tests, static build, and runtime smoke test when the change affects build or rendering.
+- Before handoff, run the type checker, tests, static build, and full runtime test when the change affects build or rendering.
 - Inspect generated HTML for escaped content, resolved links, UTF-8 preservation, correct Vue SSR output, correct base-path prefixes, and absence of browser JavaScript.
 
 ### Development Priorities

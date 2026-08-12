@@ -27,5 +27,6 @@ export const IMAGE_WIDTH_ATTRIBUTE_PATTERN = /^\s*\{\s*(?<property>width|max-wid
 export const ROUTE_PREFIX = "route:";
 export const ASSET_PREFIX = "asset:";
 export const ROUTE_SEGMENT_SEPARATOR = ":";
-export const ASSET_DIRECTORY = "assets";
+export const ASSET_DIRECTORY_NAME = "assets";
+export const ASSET_OUTPUT_DIRECTORY = ASSET_DIRECTORY_NAME;
 export const WEB_IMAGE_EXTENSIONS = [".avif", ".gif", ".jpeg", ".jpg", ".png", ".svg", ".webp"] as const;

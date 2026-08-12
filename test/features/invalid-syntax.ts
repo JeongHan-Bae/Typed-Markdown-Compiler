@@ -156,6 +156,76 @@ export const invalidFeatures: readonly InvalidFeature[] = [
     }
   },
   {
+    id: "unsafe-markdown-case-link",
+    source: "[bad](JaVaScRiPt:alert(1))",
+    sourcePath: "features/invalid-case-link.md",
+    slug: "invalid-case-link",
+    stage: "ir-error",
+    coverage: ["unsafe-url-case"],
+    expected: {
+      tokenKinds: [TokenKind.syntaxNode, TokenKind.eof],
+      syntaxNodeTypes: ["paragraph"],
+      astChildTypes: ["paragraph"],
+      error: /Unsafe URL rejected by renderer: JaVaScRiPt:alert\(1\)/u
+    }
+  },
+  {
+    id: "unsafe-markdown-encoded-link",
+    source: "[bad](%6a%61%76%61%73%63%72%69%70%74%3aalert(1))",
+    sourcePath: "features/invalid-encoded-link.md",
+    slug: "invalid-encoded-link",
+    stage: "ir-error",
+    coverage: ["unsafe-url-encoded"],
+    expected: {
+      tokenKinds: [TokenKind.syntaxNode, TokenKind.eof],
+      syntaxNodeTypes: ["paragraph"],
+      astChildTypes: ["paragraph"],
+      error: /Unsafe URL rejected by renderer: %6a%61%76%61%73%63%72%69%70%74%3aalert\(1\)/u
+    }
+  },
+  {
+    id: "unsafe-markdown-whitespace-link",
+    source: "[bad](java%09script:alert(1))",
+    sourcePath: "features/invalid-whitespace-link.md",
+    slug: "invalid-whitespace-link",
+    stage: "ir-error",
+    coverage: ["unsafe-url-whitespace"],
+    expected: {
+      tokenKinds: [TokenKind.syntaxNode, TokenKind.eof],
+      syntaxNodeTypes: ["paragraph"],
+      astChildTypes: ["paragraph"],
+      error: /Unsafe URL rejected by renderer: java%09script:alert\(1\)/u
+    }
+  },
+  {
+    id: "unsafe-markdown-data-link",
+    source: "[bad](data:text/plain,blocked)",
+    sourcePath: "features/invalid-data-link.md",
+    slug: "invalid-data-link",
+    stage: "ir-error",
+    coverage: ["unsafe-data-url-scheme"],
+    expected: {
+      tokenKinds: [TokenKind.syntaxNode, TokenKind.eof],
+      syntaxNodeTypes: ["paragraph"],
+      astChildTypes: ["paragraph"],
+      error: /Unsafe URL rejected by renderer: data:text\/plain,blocked/u
+    }
+  },
+  {
+    id: "unsafe-markdown-vbscript-link",
+    source: "[bad](vbscript:msgbox(1))",
+    sourcePath: "features/invalid-vbscript-link.md",
+    slug: "invalid-vbscript-link",
+    stage: "ir-error",
+    coverage: ["unsafe-vbscript-url-scheme"],
+    expected: {
+      tokenKinds: [TokenKind.syntaxNode, TokenKind.eof],
+      syntaxNodeTypes: ["paragraph"],
+      astChildTypes: ["paragraph"],
+      error: /Unsafe URL rejected by renderer: vbscript:msgbox\(1\)/u
+    }
+  },
+  {
     id: "unsafe-html-link",
     source: '<a href="javascript:alert(1)">bad</a>',
     sourcePath: "features/invalid-html-link.md",
@@ -168,6 +238,80 @@ export const invalidFeatures: readonly InvalidFeature[] = [
       astChildTypes: ["paragraph"],
       htmlTreeTags: ["a"],
       error: /Unsafe URL rejected by renderer: javascript:alert\(1\)/u
+    }
+  },
+  {
+    id: "unsafe-html-data-link",
+    source: '<a href="DaTa:text/plain,blocked">bad</a>',
+    sourcePath: "features/invalid-html-data-link.md",
+    slug: "invalid-html-data-link",
+    stage: "ir-error",
+    coverage: ["unsafe-html-data-url-scheme"],
+    expected: {
+      tokenKinds: [TokenKind.syntaxNode, TokenKind.eof],
+      syntaxNodeTypes: ["paragraph"],
+      astChildTypes: ["paragraph"],
+      htmlTreeTags: ["a"],
+      error: /Unsafe URL rejected by renderer: DaTa:text\/plain,blocked/u
+    }
+  },
+  {
+    id: "unsafe-html-vbscript-image",
+    source: '<img src="VBScript:msgbox(1)" alt="bad">',
+    sourcePath: "features/invalid-html-vbscript-image.md",
+    slug: "invalid-html-vbscript-image",
+    stage: "ir-error",
+    coverage: ["unsafe-html-vbscript-url-scheme"],
+    expected: {
+      tokenKinds: [TokenKind.syntaxNode, TokenKind.eof],
+      syntaxNodeTypes: ["html-block"],
+      astChildTypes: ["paragraph"],
+      htmlTreeTags: ["img"],
+      error: /Unsafe URL rejected by renderer: VBScript:msgbox\(1\)/u
+    }
+  },
+  {
+    id: "unsafe-html-whitespace-link",
+    source: '<a href="java&#x09;script:alert(1)">bad</a>',
+    sourcePath: "features/invalid-html-whitespace-link.md",
+    slug: "invalid-html-whitespace-link",
+    stage: "ir-error",
+    coverage: ["unsafe-html-url-whitespace"],
+    expected: {
+      tokenKinds: [TokenKind.syntaxNode, TokenKind.eof],
+      syntaxNodeTypes: ["paragraph"],
+      astChildTypes: ["paragraph"],
+      htmlTreeTags: ["a"],
+      error: /Unsafe URL rejected by renderer: java\s+script:alert\(1\)/u
+    }
+  },
+  {
+    id: "unsafe-html-encoded-image",
+    source: '<img src="VB%09SCRIPT%3Aalert(1)" alt="bad">',
+    sourcePath: "features/invalid-html-encoded-image.md",
+    slug: "invalid-html-encoded-image",
+    stage: "ir-error",
+    coverage: ["unsafe-html-url-encoded"],
+    expected: {
+      tokenKinds: [TokenKind.syntaxNode, TokenKind.eof],
+      syntaxNodeTypes: ["html-block"],
+      astChildTypes: ["paragraph"],
+      htmlTreeTags: ["img"],
+      error: /Unsafe URL rejected by renderer: VB%09SCRIPT%3Aalert\(1\)/u
+    }
+  },
+  {
+    id: "unknown-markdown-link-scheme",
+    source: "[bad](custom:payload)",
+    sourcePath: "features/invalid-unknown-link.md",
+    slug: "invalid-unknown-link",
+    stage: "ir-error",
+    coverage: ["unknown-url-scheme"],
+    expected: {
+      tokenKinds: [TokenKind.syntaxNode, TokenKind.eof],
+      syntaxNodeTypes: ["paragraph"],
+      astChildTypes: ["paragraph"],
+      error: /Unsafe URL rejected by renderer: custom:payload/u
     }
   },
   {
@@ -211,6 +355,48 @@ export const invalidFeatures: readonly InvalidFeature[] = [
       syntaxNodeTypes: ["paragraph"],
       astChildTypes: ["paragraph"],
       error: /Unsupported asset type: icons\/secret\.txt/u
+    }
+  },
+  {
+    id: "asset-public-root-xml",
+    source: "[bad](asset:feed.xml)",
+    sourcePath: "features/invalid-public-root-asset.md",
+    slug: "invalid-public-root-asset",
+    stage: "ir-error",
+    coverage: ["asset-public-root-file"],
+    expected: {
+      tokenKinds: [TokenKind.syntaxNode, TokenKind.eof],
+      syntaxNodeTypes: ["paragraph"],
+      astChildTypes: ["paragraph"],
+      error: /Unsupported asset type: feed\.xml/u
+    }
+  },
+  {
+    id: "asset-public-root-absolute-prefix",
+    source: "[bad](asset:/feed.xml)",
+    sourcePath: "features/invalid-absolute-public-asset.md",
+    slug: "invalid-absolute-public-asset",
+    stage: "ir-error",
+    coverage: ["asset-public-root-prefix"],
+    expected: {
+      tokenKinds: [TokenKind.syntaxNode, TokenKind.eof],
+      syntaxNodeTypes: ["paragraph"],
+      astChildTypes: ["paragraph"],
+      error: /Unsafe asset path rejected: \/feed\.xml/u
+    }
+  },
+  {
+    id: "asset-public-root-directory-prefix",
+    source: "[bad](asset:public/feed.xml)",
+    sourcePath: "features/invalid-public-directory-asset.md",
+    slug: "invalid-public-directory-asset",
+    stage: "ir-error",
+    coverage: ["asset-public-directory-prefix"],
+    expected: {
+      tokenKinds: [TokenKind.syntaxNode, TokenKind.eof],
+      syntaxNodeTypes: ["paragraph"],
+      astChildTypes: ["paragraph"],
+      error: /Unsupported asset type: public\/feed\.xml/u
     }
   },
   {
@@ -263,10 +449,23 @@ export const requiredInvalidCoverage = [
   "html-image-duplicate-sizing",
   "html-invalid-nesting",
   "unsafe-link-scheme",
+  "unsafe-url-case",
+  "unsafe-url-encoded",
+  "unsafe-url-whitespace",
+  "unsafe-data-url-scheme",
+  "unsafe-vbscript-url-scheme",
   "unsafe-html-link-scheme",
+  "unsafe-html-data-url-scheme",
+  "unsafe-html-vbscript-url-scheme",
+  "unsafe-html-url-whitespace",
+  "unsafe-html-url-encoded",
   "unsafe-html-image-scheme",
+  "unknown-url-scheme",
   "asset-path-traversal",
   "asset-unsupported-extension",
+  "asset-public-root-file",
+  "asset-public-root-prefix",
+  "asset-public-directory-prefix",
   "markdown-image-invalid-range",
   "malformed-frontmatter",
   "list-source-required"

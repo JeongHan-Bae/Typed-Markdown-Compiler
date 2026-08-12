@@ -59,6 +59,22 @@ test("normalizes Markdown and Ruby syntax into the project AST", () => {
   assert.equal(document.metadata.description, "Configured summary");
 });
 
+test("derives a document title only from frontmatter, an H1, or the file name", () => {
+  const fileNameFallback = parseMarkdown(
+    "## Section heading\n\nBody.",
+    "fixture/file-name-title.md",
+    "file-name-title"
+  );
+  const firstLevelOneHeading = parseMarkdown(
+    "## Intro section\n\n# Document title\n\nBody.",
+    "fixture/fallback.md",
+    "fallback"
+  );
+
+  assert.equal(fileNameFallback.metadata.title, "File Name Title");
+  assert.equal(firstLevelOneHeading.metadata.title, "Document title");
+});
+
 test("normalizes native alignment wrappers for text and images", async () => {
   const document = parseMarkdown([
     '<div align="left">',

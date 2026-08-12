@@ -26,10 +26,10 @@ Markdown file
   -> Vue Code Generator
   -> Vue VNodes
   -> Vue SSR
-  -> dist/**/*.html, dist/assets/**, dist/routes.json
+  -> dist/**/*.html, dist/assets/**, copied public-root files, dist/routes.json
 ```
 
-The resolver runs after parsing because routes, collections, and navigation depend on the complete set of published documents. It supplies route, asset, and collection context to AST lowering; it does not change the Markdown AST or generate HTML.
+The resolver runs after parsing because routes, collections, and navigation depend on the complete set of published documents. Content discovery is recursive, so every published Markdown file receives a route independently of list declarations. Collection mounting is direct-parent based: a document joins only the collection whose source equals its containing directory. That directory's head may be its own `index.md` or an external list page whose `source` names it. The resolver supplies route, asset, and collection context to AST lowering; it does not change the Markdown AST or generate HTML.
 
 Directory indexes have path-owned collection semantics: `blogs/index.md` is implicitly the list head for `blogs/`, is a root-navigation route named `blogs`, and is excluded from collection items. The root `index.md` is different: it owns `/` but is not implicitly a list. An external list head may use either the matching route name (`blogs.md`) or a different one (`blog.md`), but either external head conflicts with `blogs/index.md` when both target `blogs/`. The parser rejects explicit `type: page` and explicit `source` on non-root directory indexes before route resolution.
 
@@ -111,13 +111,13 @@ type IrNode =
 
 `src/codegen/vue-code-generator.ts` implements the `CodeGenerator<Input, Output>` contract from `src/codegen/types.ts`. Its input is only IR and its output is typed Vue VNodes. Vue escaping therefore occurs at the final typed-node boundary; Markdown source and arbitrary raw HTML never reach the browser.
 
-`src/renderer/vue/templates.ts` owns the four generic page templates: `page`, `list`, `list-object`, and `list-object-list`. It lowers the document AST to IR, calls `vueCodeGenerator.generate()`, and places the generated content VNodes inside the static page shell. `src/renderer/vue/page-chrome.ts` contains navigation, breadcrumbs, article navigation, and tag chrome.
+`src/renderer/vue/templates.ts` owns the four generic page templates: `page`, `list`, `list-object`, and `list-object-list`. It asks `src/ir/ast-to-ir.ts` to lower the document AST, calls `vueCodeGenerator.generate()` for the resulting IR, and places the generated content VNodes inside the static page shell. `src/renderer/vue/page-chrome.ts` contains navigation, breadcrumbs, article navigation, and tag chrome.
 
-`src/renderer/template-renderer.ts` calls `@vue/server-renderer` during the Node build. The generated browser output contains HTML and CSS only; Vue, Remark, the parser, and the compiler are not shipped to the browser.
+`src/renderer/template-renderer.ts` calls `@vue/server-renderer` during the Node build. The generated browser output contains static HTML and CSS alongside copied public files and assets; Vue, Remark, the parser, the compiler, and generated application JavaScript are not shipped to the browser.
 
 ## Build and output ownership
 
-Before build orchestration, `constants/environment.ts` reads the selected dotenv file with the `dotenv` library. Only `SITE_TITLE`, `FOOTER_TEXT`, `CONTENT_DIRECTORY`, and `PUBLIC_DIRECTORY` are accepted from that file. A non-empty accepted value replaces the same process value; an empty accepted value leaves normal process/default resolution unchanged. All other keys are ignored at this boundary, so deployment identity, repository/base-path, server, selector, and test controls retain their existing sources.
+Before build orchestration, `constants/environment.ts` reads the selected dotenv file with the `dotenv` library. Only `SITE_TITLE`, `FOOTER_TEXT`, `CONTENT_DIRECTORY`, `PUBLIC_DIRECTORY`, and `ASSET_DIRECTORY` are accepted from that file. A non-empty accepted value replaces the same process value; an empty accepted value leaves normal process/default resolution unchanged. `ASSET_DIRECTORY` defaults to `PUBLIC_DIRECTORY/assets` and must remain a child of `PUBLIC_DIRECTORY`. All other keys are ignored at this boundary, so deployment identity, repository/base-path, server, selector, and test controls retain their existing sources.
 
 `src/build.ts` owns the final build orchestration:
 
@@ -125,7 +125,7 @@ Before build orchestration, `constants/environment.ts` reads the selected dotenv
 2. discover and parse Markdown documents;
 3. resolve routes, collections, and navigation;
 4. compile Less into `dist/assets/site.css`;
-5. copy validated public assets;
+5. copy public-root files while explicitly excluding both the conventional `assets/` child and the configured asset directory, then copy the configured directory through the asset boundary;
 6. cache the optional GitHub avatar;
 7. lower and generate every route's content through the pipeline;
 8. render page templates to route `index.html` files;
@@ -135,12 +135,12 @@ The browser receives root-relative links and assets, with the configured base pa
 
 ## Repository layout
 
-The following is the architecture-focused view of `jh_cp tree . --git-view`; the root is intentionally represented by `.` so the repository can be renamed without changing this document. Compiler-owned `src/` directories are expanded separately so stage ownership and boundaries remain visible. Authoring examples, public assets, disposable runtime fixtures, and test feature data are summarized because they are inputs and verification data rather than compiler architecture:
+The following is the architecture-focused view of `jh_cp tree . --git-view`; the root is intentionally represented by `./` so the repository can be renamed without changing this document. Compiler-owned `src/` directories are expanded separately so stage ownership and boundaries remain visible. Authoring examples, public assets, disposable runtime fixtures, and test feature data are summarized because they are inputs and verification data rather than compiler architecture:
 
 `content/` is the checked-in example authoring input. The default build reads it, while a real site can replace it through `CONTENT_DIRECTORY`; it is not compiler implementation code. The disposable runtime-test examples live under `dev/rt-test/fixtures/`. The compile flow is in `dev/`, and automatic deployment is defined in `.github/workflows/deploy.yml`.
 
 ```text
-.
+./
 ├── .github/
 │   └── workflows/
 │       └── deploy.yml
@@ -152,13 +152,13 @@ The following is the architecture-focused view of `jh_cp tree . --git-view`; the
 ├── content/                  Checked-in example authoring input.
 ├── dev/
 │   ├── rt-test/
-│   │   └── fixtures/        Disposable dynamic-test content and assets.
+│   │   └── fixtures/         Disposable dynamic-test content and assets.
 │   ├── compiler.sh
 │   ├── export-env.ts
 │   ├── launcher.sh
-│   └── rt-test.sh            Dynamic build/HTTP smoke-test entrypoint.
+│   └── rt-test.sh            Full dynamic build/HTTP runtime-test entrypoint.
 ├── docs/                     Architecture, authoring, and syntax contracts.
-├── public/                   Browser-renderable source assets.
+├── public/                   Public-file root; its asset child is configurable.
 ├── src/
 │   ├── ast/
 │   │   └── types.ts
@@ -192,7 +192,7 @@ The following is the architecture-focused view of `jh_cp tree . --git-view`; the
 │   ├── site.less
 │   └── theme.less
 ├── test/                     Static compiler/build tests and feature data.
-├── .env                      Four user-facing optional build values.
+├── .env                      Five user-facing optional build values.
 ├── .gitattributes
 ├── .gitignore
 ├── AGENTS.md
@@ -210,10 +210,10 @@ The following is the architecture-focused view of `jh_cp tree . --git-view`; the
 The abbreviated operational directories still have explicit ownership:
 
 - `content/` is checked-in example input and can be replaced with `CONTENT_DIRECTORY`.
-- `public/` is checked-in browser asset input and can be replaced with `PUBLIC_DIRECTORY`.
-- `dev/rt-test/fixtures/` is disposable dynamic-test input; `dev/rt-test.sh` builds it, starts Vite, checks HTTP output, and stops the server.
+- `public/` is checked-in public-file input and can be replaced with `PUBLIC_DIRECTORY`; the conventional `assets/` child and configured `ASSET_DIRECTORY` are excluded from ordinary copying and handled separately for `asset:` references.
+- `dev/rt-test/fixtures/` is disposable dynamic-test input; `dev/rt-test.sh` builds it, starts Vite, checks every page plus its nested asset and public-root file over HTTP, and stops the server.
 - `test/features/` contains static syntax contracts; `test/feature-pipeline.test.ts` checks their Tokens, AST, IR, VNode, and SSR HTML stages, including comment removal. `dev/rt-test/fixtures/content/syntax.md` and the `/syntax` assertions in `dev/rt-test.sh` exercise the same documented positive syntax through the generated site; `draft.md` is checked as a 404.
 
 The exact operational tree is intentionally not expanded here; it is not a stage boundary.
 
-Use [Quickstart](quickstart.md) for author and build workflows and [Markdown syntax](syntax.md) for source syntax. This document is the place for stage boundaries and compiler architecture. The tree root is intentionally `.` so the repository can be renamed later.
+Use [Quickstart](quickstart.md) for author and build workflows and [Markdown syntax](syntax.md) for source syntax. This document is the place for stage boundaries and compiler architecture.

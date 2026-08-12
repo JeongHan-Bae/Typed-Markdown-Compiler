@@ -1055,7 +1055,9 @@ function toHeadingDepth(depth: number): HeadingDepth {
 }
 
 function findDocumentTitle(ast: RootNode): string | null {
-  const heading = ast.children.find((child): child is HeadingNode => child.type === "heading");
+  const heading = ast.children.find(
+    (child): child is HeadingNode => child.type === "heading" && child.depth === 1
+  );
   return heading === undefined ? null : inlineText(heading.children).trim() || null;
 }
 

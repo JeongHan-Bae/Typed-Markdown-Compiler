@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { readFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import test from "node:test";
@@ -13,7 +14,7 @@ interface RouteManifest {
   routes: Array<{ name: string; path: string }>;
 }
 
-test("copies nested public assets and emits root-relative route references", async () => {
+test("copies public-root files and nested assets with root-relative references", async () => {
   await execFileAsync(
     process.execPath,
     ["--import=tsx", "src/build.ts"],
@@ -33,6 +34,7 @@ test("copies nested public assets and emits root-relative route references", asy
   );
 
   const asset = await readFile(join(rootDirectory, "dist/assets/icons/runtime-marker.svg"), "utf8");
+  const feed = await readFile(join(rootDirectory, "dist/feed.xml"), "utf8");
   const indexHtml = await readFile(join(rootDirectory, "dist/index.html"), "utf8");
   const aboutHtml = await readFile(join(rootDirectory, "dist/about/index.html"), "utf8");
   const syntaxHtml = await readFile(join(rootDirectory, "dist/syntax/index.html"), "utf8");
@@ -47,7 +49,10 @@ test("copies nested public assets and emits root-relative route references", asy
   ) as RouteManifest;
 
   assert.match(asset, /<svg/u);
+  assert.match(feed, /<rss version="2\.0">/u);
+  assert.match(feed, /<title>Runtime fixture feed<\/title>/u);
   assert.match(indexHtml, /href="\/assets\/icons\/runtime-marker\.svg"/u);
+  assert.match(indexHtml, /href="\/feed\.xml"/u);
   assert.match(indexHtml, /src="\/assets\/icons\/runtime-marker\.svg"/u);
   assert.match(indexHtml, /--content-image-max-width: 40%/u);
   assert.match(indexHtml, new RegExp(escapeRegExp(constantDefinitions.footerText.defaultValue), "u"));
@@ -125,6 +130,7 @@ test("copies nested public assets and emits root-relative route references", asy
   assert.match(basePathHtml, /href="\/fixture-site\/"/u);
   assert.match(basePathHtml, /href="\/fixture-site\/assets\/site\.css"/u);
   assert.match(basePathHtml, /src="\/fixture-site\/assets\/icons\/runtime-marker\.svg"/u);
+  assert.match(basePathHtml, /href="\/fixture-site\/feed\.xml"/u);
   assert.doesNotMatch(basePathHtml, /href="\/assets\/site\.css"/u);
   assert.ok(basePathManifest.routes.some((route) => (
     route.name === "index"
@@ -176,6 +182,101 @@ test("uses non-empty values from a selected dotenv file", async () => {
   assert.match(indexHtml, /href="\/process-base\/"/u);
   assert.match(indexHtml, /href="\/process-base\/assets\/site\.css"/u);
   assert.match(indexHtml, /Dotenv fixture footer/u);
+});
+
+test("uses an independently configured asset directory under the public root", async () => {
+  const publicDirectory = await mkdtemp(join(tmpdir(), "typed-markdown-public-"));
+  const assetDirectory = join(publicDirectory, "browser-assets");
+  await mkdir(join(publicDirectory, "assets"), { recursive: true });
+  await mkdir(join(assetDirectory, "icons"), { recursive: true });
+  await writeFile(
+    join(publicDirectory, "assets", "default-only.txt"),
+    "This conventional asset directory is not the configured source.\n",
+    "utf8"
+  );
+  await writeFile(
+    join(publicDirectory, "feed.xml"),
+    "<?xml version=\"1.0\"?><rss version=\"2.0\"><channel><title>Configured feed</title></channel></rss>\n",
+    "utf8"
+  );
+  await writeFile(
+    join(assetDirectory, "icons", "runtime-marker.svg"),
+    "<svg xmlns=\"http://www.w3.org/2000/svg\"><title>Configured asset</title></svg>\n",
+    "utf8"
+  );
+
+  try {
+    await execFileAsync(
+      process.execPath,
+      ["--import=tsx", "src/build.ts"],
+      {
+        cwd: rootDirectory,
+        env: {
+          ...process.env,
+          SITE_TITLE: "Configured public roots",
+          GITHUB_USERNAME: "",
+          FOOTER_TEXT: "nil",
+          VITE_BASE_PATH: "",
+          ENV_FILE: "dev/rt-test/fixtures/env/empty.env",
+          CONTENT_DIRECTORY: "dev/rt-test/fixtures/content",
+          PUBLIC_DIRECTORY: publicDirectory,
+          ASSET_DIRECTORY: assetDirectory
+        }
+      }
+    );
+
+    const feed = await readFile(join(rootDirectory, "dist/feed.xml"), "utf8");
+    const asset = await readFile(
+      join(rootDirectory, "dist/assets/icons/runtime-marker.svg"),
+      "utf8"
+    );
+    const indexHtml = await readFile(join(rootDirectory, "dist/index.html"), "utf8");
+    assert.match(feed, /<title>Configured feed<\/title>/u);
+    assert.match(asset, /Configured asset/u);
+    assert.match(indexHtml, /href="\/feed\.xml"/u);
+    assert.match(indexHtml, /src="\/assets\/icons\/runtime-marker\.svg"/u);
+    await assert.rejects(
+      readFile(join(rootDirectory, "dist/browser-assets/icons/runtime-marker.svg")),
+      /ENOENT/u
+    );
+    await assert.rejects(
+      readFile(join(rootDirectory, "dist/assets/default-only.txt")),
+      /ENOENT/u
+    );
+  } finally {
+    await rm(publicDirectory, { recursive: true, force: true });
+  }
+});
+
+test("rejects an asset directory outside the public root", async () => {
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      ["--import=tsx", "src/build.ts"],
+      {
+        cwd: rootDirectory,
+        env: {
+          ...process.env,
+          GITHUB_USERNAME: "",
+          VITE_BASE_PATH: "",
+          ENV_FILE: "dev/rt-test/fixtures/env/empty.env",
+          CONTENT_DIRECTORY: "dev/rt-test/fixtures/content",
+          PUBLIC_DIRECTORY: "dev/rt-test/fixtures/public",
+          ASSET_DIRECTORY: "outside-assets"
+        }
+      }
+    ),
+    (error: unknown) => {
+      const stderr = error !== null
+        && typeof error === "object"
+        && "stderr" in error
+        && typeof error.stderr === "string"
+        ? error.stderr
+        : "";
+      assert.match(stderr, /ASSET_DIRECTORY must be a child of PUBLIC_DIRECTORY/u);
+      return true;
+    }
+  );
 });
 
 function escapeRegExp(value: string): string {
