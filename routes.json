@@ -1,0 +1,64 @@
+{
+  "routes": [
+    {
+      "name": "about",
+      "path": "/Typed-Markdown-Compiler/about/",
+      "title": "About this template",
+      "template": "page",
+      "slug": "about"
+    },
+    {
+      "name": "blog",
+      "path": "/Typed-Markdown-Compiler/blog/",
+      "title": "Field notes",
+      "template": "list",
+      "slug": "blog"
+    },
+    {
+      "name": "blogs:hello-world",
+      "path": "/Typed-Markdown-Compiler/blogs/hello-world/",
+      "title": "Hello, static world",
+      "indexed": 1,
+      "template": "list-object",
+      "collection": "blogs",
+      "slug": "hello-world"
+    },
+    {
+      "name": "blogs:typed-ast",
+      "path": "/Typed-Markdown-Compiler/blogs/typed-ast/",
+      "title": "Why keep an AST in the middle",
+      "indexed": 2,
+      "template": "list-object",
+      "collection": "blogs",
+      "slug": "typed-ast"
+    },
+    {
+      "name": "index",
+      "path": "/Typed-Markdown-Compiler/",
+      "title": "Build from Markdown",
+      "indexed": 0,
+      "template": "page",
+      "slug": "index"
+    }
+  ],
+  "collections": [
+    {
+      "name": "blogs",
+      "path": "/Typed-Markdown-Compiler/blog/",
+      "items": [
+        {
+          "slug": "hello-world",
+          "path": "/Typed-Markdown-Compiler/blogs/hello-world/",
+          "title": "Hello, static world",
+          "indexed": 1
+        },
+        {
+          "slug": "typed-ast",
+          "path": "/Typed-Markdown-Compiler/blogs/typed-ast/",
+          "title": "Why keep an AST in the middle",
+          "indexed": 2
+        }
+      ]
+    }
+  ]
+}
